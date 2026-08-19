@@ -1,9 +1,7 @@
 require("dotenv").config();
 
-const express = require("express");
 const mongoose = require("mongoose");
-
-const app = express();
+const app = require("./app");
 
 mongoose
     .connect(process.env.MONGO_URI)
@@ -13,10 +11,6 @@ mongoose
     .catch((error) => {
         console.error("MongoDB connection failed:", error.message);
     });
-
-app.get("/", (req, res) => {
-    res.send("BizFlow Backend is Running");
-});
 
 const PORT = process.env.PORT || 5000;
 
