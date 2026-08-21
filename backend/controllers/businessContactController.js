@@ -1,21 +1,35 @@
-const createBusinessContact = (req, res) => {
-    res.send("Create Business Contact");
+const businessContactService = require("../services/businessContactService");
+
+const createBusinessContact = async (req, res) => {
+    const result = await businessContactService.createBusinessContact(req.body);
+    res.send(result);
 };
 
-const getBusinessContacts = (req, res) => {
-    res.send("Get All Business Contacts");
+const getBusinessContacts = async (req, res) => {
+    const result = await businessContactService.getBusinessContacts();
+    res.send(result);
 };
 
-const getBusinessContactById = (req, res) => {
-    res.send("Get Business Contact");
+const getBusinessContactById = async (req, res) => {
+    const result = await businessContactService.getBusinessContactById(
+        req.params.id
+    );
+    res.send(result);
 };
 
-const updateBusinessContact = (req, res) => {
-    res.send("Update Business Contact");
+const updateBusinessContact = async (req, res) => {
+    const result = await businessContactService.updateBusinessContact(
+        req.params.id,
+        req.body
+    );
+    res.send(result);
 };
 
-const deleteBusinessContact = (req, res) => {
-    res.send("Delete Business Contact");
+const deleteBusinessContact = async (req, res) => {
+    const result = await businessContactService.deleteBusinessContact(
+        req.params.id
+    );
+    res.send(result);
 };
 
 module.exports = {

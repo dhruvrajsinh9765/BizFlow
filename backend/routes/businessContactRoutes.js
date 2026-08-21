@@ -1,24 +1,23 @@
-
-
-
 const express = require("express");
 
 const {
-    createCategory,
-    getCategories,
-    updateCategory,
-    deleteCategory
-} = require("../controllers/categoryController");
+    createBusinessContact,
+    getBusinessContacts,
+    getBusinessContactById,
+    updateBusinessContact,
+    deleteBusinessContact
+} = require("../controllers/businessContactController");
 
 const router = express.Router();
 
-router.post("/", createCategory);
+router.post("/", createBusinessContact);
 
-router.get("/", getCategories);
+router.get("/", getBusinessContacts);
 
-router.put("/:id", updateCategory);
+router.get("/:id", getBusinessContactById);
 
-router.delete("/:id", deleteCategory);
+router.put("/:id", updateBusinessContact);
+
+router.delete("/:id", deleteBusinessContact);
 
 module.exports = router;
-
