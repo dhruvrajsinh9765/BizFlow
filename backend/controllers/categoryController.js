@@ -1,17 +1,26 @@
-const createCategory = (req, res) => {
-    res.send("Create Category");
+const categoryService = require("../services/categoryService");
+
+const createCategory = async (req, res) => {
+    const result = await categoryService.createCategory(req.body);
+    res.send(result);
 };
 
-const getCategories = (req, res) => {
-    res.send("Get Categories");
+const getCategories = async (req, res) => {
+    const result = await categoryService.getCategories();
+    res.send(result);
 };
 
-const updateCategory = (req, res) => {
-    res.send("Update Category");
+const updateCategory = async (req, res) => {
+    const result = await categoryService.updateCategory(
+        req.params.id,
+        req.body
+    );
+    res.send(result);
 };
 
-const deleteCategory = (req, res) => {
-    res.send("Delete Category");
+const deleteCategory = async (req, res) => {
+    const result = await categoryService.deleteCategory(req.params.id);
+    res.send(result);
 };
 
 module.exports = {
@@ -20,4 +29,3 @@ module.exports = {
     updateCategory,
     deleteCategory
 };
-
