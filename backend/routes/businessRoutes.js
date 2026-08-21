@@ -1,17 +1,21 @@
+
+
+
 const express = require("express");
+const {
+    createBusiness,
+    getBusiness,
+    updateBusiness
+} = require("../controllers/businessController");
 
 const router = express.Router();
 
-router.post("/", (req, res) => {
-    res.send("Create Business");
-});
+router.post("/", createBusiness);
 
-router.get("/", (req, res) => {
-    res.send("Get Business");
-});
+router.get("/", getBusiness);
 
-router.put("/", (req, res) => {
-    res.send("Update Business");
-});
+router.put("/", updateBusiness);
 
 module.exports = router;
+
+
