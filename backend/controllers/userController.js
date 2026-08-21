@@ -1,21 +1,27 @@
-const registerUser = (req, res) => {
-    res.send("Register User");
+const userService = require("../services/userService");
+
+const registerUser = async (req, res) => {
+    const result = await userService.registerUser(req.body);
+    res.send(result);
 };
 
-const loginUser = (req, res) => {
-    res.send("Login User");
+const loginUser = async (req, res) => {
+    const result = await userService.loginUser(req.body);
+    res.send(result);
 };
 
 const logoutUser = (req, res) => {
     res.send("Logout User");
 };
 
-const getUserProfile = (req, res) => {
-    res.send("Get User Profile");
+const getUserProfile = async (req, res) => {
+    const result = await userService.getUserProfile();
+    res.send(result);
 };
 
-const updateUserProfile = (req, res) => {
-    res.send("Update User Profile");
+const updateUserProfile = async (req, res) => {
+    const result = await userService.updateUserProfile(null, req.body);
+    res.send(result);
 };
 
 module.exports = {
