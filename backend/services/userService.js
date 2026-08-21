@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const registerUser = async (userData) => {
     const { name, email, password } = userData;
@@ -28,8 +29,43 @@ const registerUser = async (userData) => {
     };
 };
 
-const loginUser = async () => {
-    return "Login User Service";
+const loginUser = async (userData) => {
+    const { email, password } = userData;
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+        throw new Error("Invalid email or password");
+    }
+
+    const isPasswordMatched = await bcrypt.compare(
+        password,
+        user.password
+    );
+
+    if (!isPasswordMatched) {
+        throw new Error("Invalid email or password");
+    }
+
+    const token = jwt.sign(
+        {
+            id: user._id
+        },
+        process.env.JWT_SECRET,
+        {
+            expiresIn: "7d"
+        }
+    );
+
+    return {
+        message: "Login successful",
+        token,
+        user: {
+            id: user._id,
+            name: user.name,
+            email: user.email
+        }
+    };
 };
 
 const logoutUser = async () => {
@@ -51,3 +87,4 @@ module.exports = {
     getUserProfile,
     updateUserProfile
 };
+
