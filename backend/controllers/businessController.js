@@ -1,17 +1,18 @@
+const businessService = require("../services/businessService");
 
-
-
-
-const createBusiness = (req, res) => {
-    res.send("Create Business");
+const createBusiness = async (req, res) => {
+    const result = await businessService.createBusiness(req.body);
+    res.send(result);
 };
 
-const getBusiness = (req, res) => {
-    res.send("Get Business");
+const getBusiness = async (req, res) => {
+    const result = await businessService.getBusiness();
+    res.send(result);
 };
 
-const updateBusiness = (req, res) => {
-    res.send("Update Business");
+const updateBusiness = async (req, res) => {
+    const result = await businessService.updateBusiness(null, req.body);
+    res.send(result);
 };
 
 module.exports = {
@@ -19,4 +20,3 @@ module.exports = {
     getBusiness,
     updateBusiness
 };
-
