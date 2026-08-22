@@ -53,7 +53,32 @@ const getBusinessContactById = async (userId, contactId) => {
 };
 
 const updateBusinessContact = async (userId, contactId, contactData) => {
-    return "Update Business Contact Service";
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    const contact = await BusinessContact.findOneAndUpdate(
+        {
+            _id: contactId,
+            businessId: business._id
+        },
+        contactData,
+        {
+            new: true,
+            runValidators: true
+        }
+    );
+
+    if (!contact) {
+        throw new Error("Business contact not found");
+    }
+
+    return {
+        message: "Business contact updated successfully",
+        contact
+    };
 };
 
 const deleteBusinessContact = async (userId, contactId) => {
@@ -67,4 +92,3 @@ module.exports = {
     updateBusinessContact,
     deleteBusinessContact
 };
-
