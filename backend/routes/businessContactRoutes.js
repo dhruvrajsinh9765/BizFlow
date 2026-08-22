@@ -8,16 +8,19 @@ const {
     deleteBusinessContact
 } = require("../controllers/businessContactController");
 
+const protect = require("../middleware/authMiddleware");
+
 const router = express.Router();
 
-router.post("/", createBusinessContact);
+router.post("/", protect, createBusinessContact);
 
-router.get("/", getBusinessContacts);
+router.get("/", protect, getBusinessContacts);
 
-router.get("/:id", getBusinessContactById);
+router.get("/:id", protect, getBusinessContactById);
 
-router.put("/:id", updateBusinessContact);
+router.put("/:id", protect, updateBusinessContact);
 
-router.delete("/:id", deleteBusinessContact);
+router.delete("/:id", protect, deleteBusinessContact);
 
 module.exports = router;
+
