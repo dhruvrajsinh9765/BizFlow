@@ -57,19 +57,55 @@ const createTransaction = async (userId, transactionData) => {
     };
 };
 
-const getTransactions = async (userId) => {
+const getTransactions = async (userId, filters) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
         throw new Error("Business not found");
     }
 
-    const transactions = await Transaction.find({
+    const {
+        categoryId,
+        contactId,
+        paymentMethod,
+        startDate,
+        endDate
+    } = filters;
+
+    const query = {
         businessId: business._id
-    });
+    };
+
+    if (categoryId !== undefined) {
+        query.categoryId = categoryId;
+    }
+
+    if (contactId !== undefined) {
+        query.contactId = contactId;
+    }
+
+    if (paymentMethod !== undefined) {
+        query.paymentMethod = paymentMethod;
+    }
+
+    if (startDate !== undefined || endDate !== undefined) {
+        query.transactionDate = {};
+
+        if (startDate !== undefined) {
+            query.transactionDate.$gte = new Date(startDate);
+        }
+
+        if (endDate !== undefined) {
+            query.transactionDate.$lte = new Date(endDate);
+        }
+    }
+
+    const transactions = await Transaction.find(query);
 
     return transactions;
 };
+
+
 
 const getTransactionById = async (userId, transactionId) => {
     const business = await Business.findOne({ userId });
