@@ -10,7 +10,10 @@ const createTransaction = async (req, res) => {
 };
 
 const getTransactions = async (req, res) => {
-    const result = await transactionService.getTransactions(req.user.id);
+    const result = await transactionService.getTransactions(
+        req.user.id,
+        req.query
+    );
 
     res.send(result);
 };
