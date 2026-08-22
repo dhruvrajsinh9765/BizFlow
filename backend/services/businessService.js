@@ -29,7 +29,32 @@ const getBusiness = async (userId) => {
 };
 
 const updateBusiness = async (userId, businessData) => {
-    return "Update Business Service";
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    const allowedFields = [
+        "businessName",
+        "businessType",
+        "phone",
+        "email",
+        "address"
+    ];
+
+    allowedFields.forEach((field) => {
+        if (businessData[field] !== undefined) {
+            business[field] = businessData[field];
+        }
+    });
+
+    const updatedBusiness = await business.save();
+
+    return {
+        message: "Business updated successfully",
+        business: updatedBusiness
+    };
 };
 
 module.exports = {
@@ -37,4 +62,3 @@ module.exports = {
     getBusiness,
     updateBusiness
 };
-
