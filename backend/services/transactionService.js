@@ -173,9 +173,28 @@ const updateTransaction = async (
 };
 
 // Will be implemented in Work Chunk 2
-const deleteTransaction = async () => {
-    return "Delete Transaction Service";
+const deleteTransaction = async (userId, transactionId) => {
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    const transaction = await Transaction.findOneAndDelete({
+        _id: transactionId,
+        businessId: business._id
+    });
+
+    if (!transaction) {
+        throw new Error("Transaction not found");
+    }
+
+    return {
+        message: "Transaction deleted successfully"
+    };
 };
+
+
 
 module.exports = {
     createTransaction,
