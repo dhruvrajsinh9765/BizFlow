@@ -69,7 +69,9 @@ const getTransactions = async (userId, filters) => {
         contactId,
         paymentMethod,
         startDate,
-        endDate
+        endDate,
+        sortBy,
+        order
     } = filters;
 
     const query = {
@@ -100,7 +102,25 @@ const getTransactions = async (userId, filters) => {
         }
     }
 
-    const transactions = await Transaction.find(query);
+   let sortOptions = {
+    transactionDate: -1
+};
+
+if (sortBy !== undefined) {
+    const allowedSortFields = ["transactionDate", "amount"];
+
+    if (!allowedSortFields.includes(sortBy)) {
+        throw new Error("Invalid sort field");
+    }
+
+    sortOptions = {
+        [sortBy]: order === "asc" ? 1 : -1
+    };
+}
+
+const transactions = await Transaction.find(query).sort(sortOptions);
+
+ 
 
     return transactions;
 };
