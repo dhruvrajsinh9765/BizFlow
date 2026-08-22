@@ -75,7 +75,7 @@ const updateBusinessContact = async (userId, contactId, contactData) => {
         },
         updateData,
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true
         }
     );
