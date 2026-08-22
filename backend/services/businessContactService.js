@@ -34,7 +34,22 @@ const getBusinessContacts = async (userId) => {
 };
 
 const getBusinessContactById = async (userId, contactId) => {
-    return "Get Business Contact Service";
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    const contact = await BusinessContact.findOne({
+        _id: contactId,
+        businessId: business._id
+    });
+
+    if (!contact) {
+        throw new Error("Business contact not found");
+    }
+
+    return contact;
 };
 
 const updateBusinessContact = async (userId, contactId, contactData) => {
@@ -52,3 +67,4 @@ module.exports = {
     updateBusinessContact,
     deleteBusinessContact
 };
+
