@@ -85,14 +85,18 @@ const getTransactions = async (userId, filters) => {
         !Number.isInteger(pageNumber) ||
         pageNumber < 1
     ) {
-        throw new Error("Page must be a positive integer");
+        const error = new Error("Page must be a positive integer");
+        error.statusCode = 400;
+        throw error;
     }
 
     if (
         !Number.isInteger(limitNumber) ||
         limitNumber < 1
     ) {
-        throw new Error("Limit must be a positive integer");
+        const error = new Error("Limit must be a positive integer");
+        error.statusCode = 400;
+        throw error;
     }
 
     // Calculate how many transactions to skip
@@ -299,4 +303,3 @@ module.exports = {
     updateTransaction,
     deleteTransaction
 };
-
