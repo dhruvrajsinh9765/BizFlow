@@ -82,8 +82,43 @@ const getUserProfile = async (userId) => {
     return user;
 };
 
-const updateUserProfile = async () => {
-    return "Update User Profile Service";
+const updateUserProfile = async (userId, userData) => {
+    const { name, email, password } = userData;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    if (email && email !== user.email) {
+        const existingUser = await User.findOne({ email });
+
+        if (existingUser) {
+            throw new Error("Email already exists");
+        }
+
+        user.email = email;
+    }
+
+    if (name) {
+        user.name = name;
+    }
+
+    if (password) {
+        user.password = await bcrypt.hash(password, 10);
+    }
+
+    const updatedUser = await user.save();
+
+    return {
+        message: "Profile updated successfully",
+        user: {
+            id: updatedUser._id,
+            name: updatedUser.name,
+            email: updatedUser.email
+        }
+    };
 };
 
 module.exports = {
@@ -93,3 +128,4 @@ module.exports = {
     getUserProfile,
     updateUserProfile
 };
+
