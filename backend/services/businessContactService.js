@@ -59,12 +59,21 @@ const updateBusinessContact = async (userId, contactId, contactData) => {
         throw new Error("Business not found");
     }
 
+    const { name, phone, email, address } = contactData;
+
+    const updateData = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (address !== undefined) updateData.address = address;
+
     const contact = await BusinessContact.findOneAndUpdate(
         {
             _id: contactId,
             businessId: business._id
         },
-        contactData,
+        updateData,
         {
             new: true,
             runValidators: true
