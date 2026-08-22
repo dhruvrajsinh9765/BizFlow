@@ -2,11 +2,13 @@ const userService = require("../services/userService");
 
 const registerUser = async (req, res) => {
     const result = await userService.registerUser(req.body);
+
     res.send(result);
 };
 
 const loginUser = async (req, res) => {
     const result = await userService.loginUser(req.body);
+
     res.send(result);
 };
 
@@ -15,12 +17,17 @@ const logoutUser = (req, res) => {
 };
 
 const getUserProfile = async (req, res) => {
-    const result = await userService.getUserProfile();
+    const result = await userService.getUserProfile(req.user._id);
+
     res.send(result);
 };
 
 const updateUserProfile = async (req, res) => {
-    const result = await userService.updateUserProfile(null, req.body);
+    const result = await userService.updateUserProfile(
+        req.user._id,
+        req.body
+    );
+
     res.send(result);
 };
 

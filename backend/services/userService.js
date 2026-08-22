@@ -72,8 +72,14 @@ const logoutUser = async () => {
     return "Logout User Service";
 };
 
-const getUserProfile = async () => {
-    return "Get User Profile Service";
+const getUserProfile = async (userId) => {
+    const user = await User.findById(userId).select("-password");
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    return user;
 };
 
 const updateUserProfile = async () => {
@@ -87,4 +93,3 @@ module.exports = {
     getUserProfile,
     updateUserProfile
 };
-
