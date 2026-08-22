@@ -19,7 +19,13 @@ const createBusiness = async (userId, businessData) => {
 };
 
 const getBusiness = async (userId) => {
-    return "Get Business Service";
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    return business;
 };
 
 const updateBusiness = async (userId, businessData) => {
@@ -31,3 +37,4 @@ module.exports = {
     getBusiness,
     updateBusiness
 };
+
