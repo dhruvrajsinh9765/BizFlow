@@ -1,20 +1,102 @@
-const createTransaction = async (transactionData) => {
-    return "Create Transaction Service";
+const Business = require("../models/Business");
+const Category = require("../models/Category");
+const BusinessContact = require("../models/BusinessContact");
+const Transaction = require("../models/Transaction");
+
+const createTransaction = async (userId, transactionData) => {
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    const {
+        categoryId,
+        contactId,
+        amount,
+        paymentMethod,
+        transactionDate,
+        description
+    } = transactionData;
+
+    // Verify that the category belongs to this business
+    const category = await Category.findOne({
+        _id: categoryId,
+        businessId: business._id
+    });
+
+    if (!category) {
+        throw new Error("Category not found");
+    }
+
+    // Verify contact ownership if a contact is provided
+    if (contactId) {
+        const contact = await BusinessContact.findOne({
+            _id: contactId,
+            businessId: business._id
+        });
+
+        if (!contact) {
+            throw new Error("Business contact not found");
+        }
+    }
+
+    const transaction = await Transaction.create({
+        businessId: business._id,
+        categoryId,
+        contactId: contactId || null,
+        amount,
+        paymentMethod,
+        transactionDate,
+        description
+    });
+
+    return {
+        message: "Transaction created successfully",
+        transaction
+    };
 };
 
-const getTransactions = async () => {
-    return "Get Transactions Service";
+const getTransactions = async (userId) => {
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    const transactions = await Transaction.find({
+        businessId: business._id
+    });
+
+    return transactions;
 };
 
-const getTransactionById = async (transactionId) => {
-    return "Get Transaction Service";
+const getTransactionById = async (userId, transactionId) => {
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    const transaction = await Transaction.findOne({
+        _id: transactionId,
+        businessId: business._id
+    });
+
+    if (!transaction) {
+        throw new Error("Transaction not found");
+    }
+
+    return transaction;
 };
 
-const updateTransaction = async (transactionId, transactionData) => {
+// Will be implemented in Work Chunk 2
+const updateTransaction = async () => {
     return "Update Transaction Service";
 };
 
-const deleteTransaction = async (transactionId) => {
+// Will be implemented in Work Chunk 2
+const deleteTransaction = async () => {
     return "Delete Transaction Service";
 };
 

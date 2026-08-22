@@ -26,11 +26,6 @@ const transactionSchema = new mongoose.Schema(
             min: 0
         },
 
-        transactionType: {
-            type: String,
-            required: true,
-            enum: ["income", "expense"]
-        },
 
         paymentMethod: {
             type: String,
