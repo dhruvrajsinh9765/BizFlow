@@ -91,7 +91,24 @@ const updateBusinessContact = async (userId, contactId, contactData) => {
 };
 
 const deleteBusinessContact = async (userId, contactId) => {
-    return "Delete Business Contact Service";
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new Error("Business not found");
+    }
+
+    const contact = await BusinessContact.findOneAndDelete({
+        _id: contactId,
+        businessId: business._id
+    });
+
+    if (!contact) {
+        throw new Error("Business contact not found");
+    }
+
+    return {
+        message: "Business contact deleted successfully"
+    };
 };
 
 module.exports = {
@@ -101,3 +118,4 @@ module.exports = {
     updateBusinessContact,
     deleteBusinessContact
 };
+
