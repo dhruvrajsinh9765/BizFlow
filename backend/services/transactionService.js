@@ -80,6 +80,21 @@ const getTransactions = async (userId, filters) => {
     const pageNumber = Number(page);
     const limitNumber = Number(limit);
 
+    // Validate pagination values
+    if (
+        !Number.isInteger(pageNumber) ||
+        pageNumber < 1
+    ) {
+        throw new Error("Page must be a positive integer");
+    }
+
+    if (
+        !Number.isInteger(limitNumber) ||
+        limitNumber < 1
+    ) {
+        throw new Error("Limit must be a positive integer");
+    }
+
     // Calculate how many transactions to skip
     const skip = (pageNumber - 1) * limitNumber;
 
