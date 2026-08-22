@@ -71,8 +71,17 @@ const getTransactions = async (userId, filters) => {
         startDate,
         endDate,
         sortBy,
-        order
+        order,
+        page = 1,
+        limit = 10
     } = filters;
+
+    // Convert query string values to numbers
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+
+    // Calculate how many transactions to skip
+    const skip = (pageNumber - 1) * limitNumber;
 
     const query = {
         businessId: business._id
@@ -102,30 +111,43 @@ const getTransactions = async (userId, filters) => {
         }
     }
 
-   let sortOptions = {
-    transactionDate: -1
-};
+    let sortOptions = {
+        transactionDate: -1
+    };
 
-if (sortBy !== undefined) {
-    const allowedSortFields = ["transactionDate", "amount"];
+    if (sortBy !== undefined) {
+        const allowedSortFields = ["transactionDate", "amount"];
 
-    if (!allowedSortFields.includes(sortBy)) {
-        throw new Error("Invalid sort field");
+        if (!allowedSortFields.includes(sortBy)) {
+            throw new Error("Invalid sort field");
+        }
+
+        sortOptions = {
+            [sortBy]: order === "asc" ? 1 : -1
+        };
     }
 
-    sortOptions = {
-        [sortBy]: order === "asc" ? 1 : -1
+    // Count all transactions matching the filters
+    const totalTransactions = await Transaction.countDocuments(query);
+
+    // Apply filtering, sorting, and pagination
+    const transactions = await Transaction.find(query)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limitNumber);
+
+    return {
+        transactions,
+        pagination: {
+            totalTransactions,
+            currentPage: pageNumber,
+            totalPages: Math.ceil(
+                totalTransactions / limitNumber
+            ),
+            limit: limitNumber
+        }
     };
-}
-
-const transactions = await Transaction.find(query).sort(sortOptions);
-
- 
-
-    return transactions;
 };
-
-
 
 const getTransactionById = async (userId, transactionId) => {
     const business = await Business.findOne({ userId });
@@ -146,7 +168,6 @@ const getTransactionById = async (userId, transactionId) => {
     return transaction;
 };
 
-// Will be implemented in Work Chunk 2
 const updateTransaction = async (
     userId,
     transactionId,
@@ -200,11 +221,18 @@ const updateTransaction = async (
     }
 
     if (amount !== undefined) updateData.amount = amount;
-    if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+
+    if (paymentMethod !== undefined) {
+        updateData.paymentMethod = paymentMethod;
+    }
+
     if (transactionDate !== undefined) {
         updateData.transactionDate = transactionDate;
     }
-    if (description !== undefined) updateData.description = description;
+
+    if (description !== undefined) {
+        updateData.description = description;
+    }
 
     const transaction = await Transaction.findOneAndUpdate(
         {
@@ -228,7 +256,6 @@ const updateTransaction = async (
     };
 };
 
-// Will be implemented in Work Chunk 2
 const deleteTransaction = async (userId, transactionId) => {
     const business = await Business.findOne({ userId });
 
@@ -249,8 +276,6 @@ const deleteTransaction = async (userId, transactionId) => {
         message: "Transaction deleted successfully"
     };
 };
-
-
 
 module.exports = {
     createTransaction,
