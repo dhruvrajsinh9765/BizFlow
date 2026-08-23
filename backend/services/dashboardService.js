@@ -26,13 +26,13 @@ const getDashboardSummary = async (userId) => {
             }
         },
         {
-            unwind:"category"
+            $unwind: "$category"
         },
         {
             $group: {
                 _id: "$category.type",
                 total: {
-                    sum:"amount"
+                    $sum: "$amount"
                 }
             }
         }
@@ -67,19 +67,19 @@ const getDashboardSummary = async (userId) => {
             }
         },
         {
-            unwind:"category"
+            $unwind: "$category"
         },
         {
             $group: {
                 _id: "$categoryId",
                 categoryName: {
-                    first:"category.name"
+                    $first: "$category.name"
                 },
                 type: {
-                    first:"category.type"
+                    $first: "$category.type"
                 },
                 total: {
-                    sum:"amount"
+                    $sum: "$amount"
                 }
             }
         },
@@ -118,4 +118,3 @@ const getDashboardSummary = async (userId) => {
 module.exports = {
     getDashboardSummary
 };
-
