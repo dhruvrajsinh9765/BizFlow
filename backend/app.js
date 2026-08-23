@@ -8,16 +8,20 @@ const transactionRoutes = require("./routes/transactionRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const insightRoutes = require("./routes/insightRoutes");
 
+const cookieParser = require("cookie-parser");
 const errorHandler = require("./middleware/errorMiddleware");
 
 const app = express();
 
+// Middleware
 app.use(express.json());
+app.use(cookieParser());
 
 app.get("/", (req, res) => {
     res.send("BizFlow Backend is Running");
 });
 
+// Routes
 app.use("/api/business", businessRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/contacts", businessContactRoutes);
