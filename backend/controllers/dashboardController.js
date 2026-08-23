@@ -8,6 +8,16 @@ const getDashboardSummary = async (req, res) => {
     res.send(result);
 };
 
+const getFinancialAnalytics = async (req, res) => {
+    const result = await dashboardService.getFinancialAnalytics(
+        req.user.id,
+        req.query
+    );
+
+    res.send(result);
+};
+
 module.exports = {
-    getDashboardSummary
+    getDashboardSummary,
+    getFinancialAnalytics
 };

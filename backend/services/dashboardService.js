@@ -1,6 +1,12 @@
 const Business = require("../models/Business");
 const Transaction = require("../models/Transaction");
 
+const createBadRequestError = (message) => {
+    const error = new Error(message);
+    error.statusCode = 400;
+    return error;
+};
+
 const getDashboardSummary = async (userId) => {
     const business = await Business.findOne({ userId });
 
@@ -26,13 +32,13 @@ const getDashboardSummary = async (userId) => {
             }
         },
         {
-            unwind:"category"
+            $unwind: "$category"
         },
         {
             $group: {
                 _id: "$category.type",
                 total: {
-                    sum:"amount"
+                    $sum: "$amount"
                 }
             }
         }
@@ -67,19 +73,19 @@ const getDashboardSummary = async (userId) => {
             }
         },
         {
-            unwind:"category"
+            $unwind: "$category"
         },
         {
             $group: {
                 _id: "$categoryId",
                 categoryName: {
-                    first:"category.name"
+                    $first: "$category.name"
                 },
                 type: {
-                    first:"category.type"
+                    $first: "$category.type"
                 },
                 total: {
-                    sum:"amount"
+                    $sum: "$amount"
                 }
             }
         },
@@ -115,7 +121,6 @@ const getDashboardSummary = async (userId) => {
     };
 };
 
-
 const getFinancialAnalytics = async (userId, filters) => {
     const business = await Business.findOne({ userId });
 
@@ -130,20 +135,53 @@ const getFinancialAnalytics = async (userId, filters) => {
 
     const businessId = business._id;
 
+    // Validate start date
+    let parsedStartDate;
+
+    if (startDate !== undefined) {
+        parsedStartDate = new Date(startDate);
+
+        if (Number.isNaN(parsedStartDate.getTime())) {
+            throw createBadRequestError("Invalid start date");
+        }
+    }
+
+    // Validate end date
+    let parsedEndDate;
+
+    if (endDate !== undefined) {
+        parsedEndDate = new Date(endDate);
+
+        if (Number.isNaN(parsedEndDate.getTime())) {
+            throw createBadRequestError("Invalid end date");
+        }
+    }
+
+    // Validate date range
+    if (
+        parsedStartDate !== undefined &&
+        parsedEndDate !== undefined &&
+        parsedStartDate > parsedEndDate
+    ) {
+        throw createBadRequestError(
+            "Start date cannot be later than end date"
+        );
+    }
+
     // Build the transaction filter
     const matchQuery = {
         businessId
     };
 
-    if (startDate !== undefined || endDate !== undefined) {
+    if (parsedStartDate !== undefined || parsedEndDate !== undefined) {
         matchQuery.transactionDate = {};
 
-        if (startDate !== undefined) {
-            matchQuery.transactionDate.$gte = new Date(startDate);
+        if (parsedStartDate !== undefined) {
+            matchQuery.transactionDate.$gte = parsedStartDate;
         }
 
-        if (endDate !== undefined) {
-            matchQuery.transactionDate.$lte = new Date(endDate);
+        if (parsedEndDate !== undefined) {
+            matchQuery.transactionDate.$lte = parsedEndDate;
         }
     }
 
@@ -161,13 +199,13 @@ const getFinancialAnalytics = async (userId, filters) => {
             }
         },
         {
-            unwind:"category"
+            $unwind: "$category"
         },
         {
             $group: {
                 _id: "$category.type",
                 total: {
-                    sum:"amount"
+                    $sum: "$amount"
                 }
             }
         }
@@ -200,21 +238,21 @@ const getFinancialAnalytics = async (userId, filters) => {
             }
         },
         {
-            unwind:"category"
+            $unwind: "$category"
         },
         {
             $group: {
                 _id: {
                     year: {
-                        year:"transactionDate"
+                        $year: "$transactionDate"
                     },
                     month: {
-                        month:"transactionDate"
+                        $month: "$transactionDate"
                     },
                     type: "$category.type"
                 },
                 total: {
-                    sum:"amount"
+                    $sum: "$amount"
                 }
             }
         },
@@ -325,19 +363,19 @@ const getFinancialAnalytics = async (userId, filters) => {
             }
         },
         {
-            unwind:"category"
+            $unwind: "$category"
         },
         {
             $group: {
                 _id: "$categoryId",
                 categoryName: {
-                    first:"category.name"
+                    $first: "$category.name"
                 },
                 type: {
-                    first:"category.type"
+                    $first: "$category.type"
                 },
                 total: {
-                    sum:"amount"
+                    $sum: "$amount"
                 }
             }
         },
@@ -368,9 +406,7 @@ const getFinancialAnalytics = async (userId, filters) => {
     };
 };
 
-
 module.exports = {
     getDashboardSummary,
     getFinancialAnalytics
 };
-
