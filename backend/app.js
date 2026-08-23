@@ -6,6 +6,7 @@ const businessContactRoutes = require("./routes/businessContactRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const transactionRoutes = require("./routes/transactionRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const insightRoutes = require("./routes/insightRoutes");
 
 const errorHandler = require("./middleware/errorMiddleware");
 
@@ -23,6 +24,7 @@ app.use("/api/contacts", businessContactRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/insights", insightRoutes);
 
 // Error middleware must be after all routes
 app.use(errorHandler);
