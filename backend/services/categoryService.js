@@ -1,14 +1,23 @@
 const Business = require("../models/Business");
 const Category = require("../models/Category");
+const AppError = require("../utils/Apperror");
 
-const createCategory = async (userId, categoryData) => {
+const createCategory = async (userId, categoryData = {}) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        const error = new Error("Business not found");
+        error.statusCode = 404;
+        throw error;
     }
 
     const { name, type } = categoryData;
+
+    if (name === undefined && type === undefined) {
+        const error = new Error("Name and type are required");
+        error.statusCode = 400;
+        throw error;
+    }
 
     const category = await Category.create({
         businessId: business._id,
@@ -22,11 +31,12 @@ const createCategory = async (userId, categoryData) => {
     };
 };
 
+
 const getCategories = async (userId) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
     const categories = await Category.find({
@@ -36,19 +46,60 @@ const getCategories = async (userId) => {
     return categories;
 };
 
+
+const getCategoryById = async (userId, categoryId) => {
+    const business = await Business.findOne({ userId });
+
+    if (!business) {
+        throw new AppError("Business not found", 404);
+    }
+
+    const category = await Category.findOne({
+        _id: categoryId,
+        businessId: business._id
+    });
+
+    if (!category) {
+        throw new AppError("Category not found", 404);
+    }
+
+    return category;
+};
+
+
 const updateCategory = async (userId, categoryId, categoryData) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
-    const { name, type } = categoryData;
+    const allowedFields = ["name", "type"];
+    const fieldsToUpdate = Object.keys(categoryData || {});
+
+    if (fieldsToUpdate.length === 0) {
+        throw new AppError(
+            "At least one field is required to update the category",
+            400
+        );
+    }
+
+    const validFields = fieldsToUpdate.filter((field) =>
+        allowedFields.includes(field)
+    );
+
+    if (validFields.length === 0) {
+        throw new AppError(
+            "No valid fields provided for update",
+            400
+        );
+    }
 
     const updateData = {};
 
-    if (name !== undefined) updateData.name = name;
-    if (type !== undefined) updateData.type = type;
+    validFields.forEach((field) => {
+        updateData[field] = categoryData[field];
+    });
 
     const category = await Category.findOneAndUpdate(
         {
@@ -63,7 +114,7 @@ const updateCategory = async (userId, categoryId, categoryData) => {
     );
 
     if (!category) {
-        throw new Error("Category not found");
+        throw new AppError("Category not found", 404);
     }
 
     return {
@@ -72,11 +123,12 @@ const updateCategory = async (userId, categoryId, categoryData) => {
     };
 };
 
+
 const deleteCategory = async (userId, categoryId) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
     const category = await Category.findOneAndDelete({
@@ -85,7 +137,7 @@ const deleteCategory = async (userId, categoryId) => {
     });
 
     if (!category) {
-        throw new Error("Category not found");
+        throw new AppError("Category not found", 404);
     }
 
     return {
@@ -93,10 +145,11 @@ const deleteCategory = async (userId, categoryId) => {
     };
 };
 
+
 module.exports = {
     createCategory,
     getCategories,
+    getCategoryById,
     updateCategory,
     deleteCategory
 };
-

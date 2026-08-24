@@ -14,6 +14,26 @@ const {
 const registerUser = async (userData) => {
     const { name, email, password } = userData;
 
+    // Validate required fields
+    if (
+        !name?.trim() ||
+        !email?.trim() ||
+        !password?.trim()
+    ) {
+        throw new AppError(
+            "Name, email and password are required",
+            400
+        );
+    }
+
+    // Validate password length before hashing
+    if (password.length < 6) {
+        throw new AppError(
+            "Password must be at least 6 characters long",
+            400
+        );
+    }
+
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
@@ -41,6 +61,14 @@ const registerUser = async (userData) => {
 
 const loginUser = async (userData) => {
     const { email, password } = userData;
+
+    // Validate required fields
+    if (!email || !password) {
+        throw new AppError(
+            "Email and password are required",
+            400
+        );
+    }
 
     const user = await User.findOne({ email });
 
@@ -106,7 +134,10 @@ const refreshAccessToken = async (refreshToken) => {
     try {
         decoded = verifyRefreshToken(refreshToken);
     } catch (error) {
-        throw new AppError("Invalid or expired refresh token", 401);
+        throw new AppError(
+            "Invalid or expired refresh token",
+            401
+        );
     }
 
     const session = await Session.findOne({
@@ -156,7 +187,10 @@ const logoutUser = async (refreshToken) => {
     try {
         decoded = verifyRefreshToken(refreshToken);
     } catch (error) {
-        throw new AppError("Invalid or expired refresh token", 401);
+        throw new AppError(
+            "Invalid or expired refresh token",
+            401
+        );
     }
 
     const session = await Session.findOne({
@@ -187,8 +221,20 @@ const logoutUser = async (refreshToken) => {
 };
 
 
+const logoutFromAllDevices = async (userId) => {
+    await Session.deleteMany({
+        userId
+    });
+
+    return {
+        message: "Logged out from all devices successfully"
+    };
+};
+
+
 const getUserProfile = async (userId) => {
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findById(userId)
+        .select("-password");
 
     if (!user) {
         throw new AppError("User not found", 404);
@@ -222,8 +268,16 @@ const updateUserProfile = async (userId, userData) => {
     }
 
     if (password) {
+    if (password.length < 6) {
+        throw new AppError(
+            "Password must be at least 6 characters long",
+            400
+        );
+    }
+
     user.password = await bcrypt.hash(password, 10);
 
+    // Password change invalidates all existing sessions
     await Session.deleteMany({
         userId
     });
@@ -241,15 +295,6 @@ const updateUserProfile = async (userId, userData) => {
     };
 };
 
-const logoutFromAllDevices = async (userId) => {
-    await Session.deleteMany({
-        userId
-    });
-
-    return {
-        message: "Logged out from all devices successfully"
-    };
-};
 
 module.exports = {
     registerUser,

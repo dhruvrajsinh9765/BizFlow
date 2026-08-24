@@ -1,11 +1,13 @@
 const Business = require("../models/Business");
 const BusinessContact = require("../models/BusinessContact");
+const AppError = require("../utils/Apperror");
+
 
 const createBusinessContact = async (userId, contactData) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
     const contact = await BusinessContact.create({
@@ -19,11 +21,12 @@ const createBusinessContact = async (userId, contactData) => {
     };
 };
 
+
 const getBusinessContacts = async (userId) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
     const contacts = await BusinessContact.find({
@@ -33,11 +36,12 @@ const getBusinessContacts = async (userId) => {
     return contacts;
 };
 
+
 const getBusinessContactById = async (userId, contactId) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
     const contact = await BusinessContact.findOne({
@@ -46,27 +50,59 @@ const getBusinessContactById = async (userId, contactId) => {
     });
 
     if (!contact) {
-        throw new Error("Business contact not found");
+        throw new AppError("Business contact not found", 404);
     }
 
     return contact;
 };
 
-const updateBusinessContact = async (userId, contactId, contactData) => {
+
+const updateBusinessContact = async (
+    userId,
+    contactId,
+    contactData
+) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
-    const { name, phone, email, address } = contactData;
+    const allowedFields = [
+        "name",
+        "phone",
+        "email",
+        "address"
+    ];
+
+    const fieldsToUpdate = Object.keys(contactData || {});
+
+    // Empty request body
+    if (fieldsToUpdate.length === 0) {
+        throw new AppError(
+            "At least one field is required to update the business contact",
+            400
+        );
+    }
+
+    // Keep only valid fields
+    const validFields = fieldsToUpdate.filter((field) =>
+        allowedFields.includes(field)
+    );
+
+    // Only unknown fields were provided
+    if (validFields.length === 0) {
+        throw new AppError(
+            "No valid fields provided for update",
+            400
+        );
+    }
 
     const updateData = {};
 
-    if (name !== undefined) updateData.name = name;
-    if (phone !== undefined) updateData.phone = phone;
-    if (email !== undefined) updateData.email = email;
-    if (address !== undefined) updateData.address = address;
+    validFields.forEach((field) => {
+        updateData[field] = contactData[field];
+    });
 
     const contact = await BusinessContact.findOneAndUpdate(
         {
@@ -81,7 +117,7 @@ const updateBusinessContact = async (userId, contactId, contactData) => {
     );
 
     if (!contact) {
-        throw new Error("Business contact not found");
+        throw new AppError("Business contact not found", 404);
     }
 
     return {
@@ -90,11 +126,12 @@ const updateBusinessContact = async (userId, contactId, contactData) => {
     };
 };
 
+
 const deleteBusinessContact = async (userId, contactId) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
     const contact = await BusinessContact.findOneAndDelete({
@@ -103,13 +140,14 @@ const deleteBusinessContact = async (userId, contactId) => {
     });
 
     if (!contact) {
-        throw new Error("Business contact not found");
+        throw new AppError("Business contact not found", 404);
     }
 
     return {
         message: "Business contact deleted successfully"
     };
 };
+
 
 module.exports = {
     createBusinessContact,
@@ -118,4 +156,3 @@ module.exports = {
     updateBusinessContact,
     deleteBusinessContact
 };
-

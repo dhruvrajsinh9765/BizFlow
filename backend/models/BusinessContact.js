@@ -10,19 +10,27 @@ const businessContactSchema = new mongoose.Schema(
 
         name: {
             type: String,
-            required: true,
+            required: [true, "Contact name is required"],
             trim: true
         },
 
         phone: {
             type: String,
-            trim: true
+            trim: true,
+            match: [
+                /^[0-9]{10}$/,
+                "Please provide a valid 10-digit phone number"
+            ]
         },
 
         email: {
             type: String,
             trim: true,
-            lowercase: true
+            lowercase: true,
+            match: [
+                /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                "Please provide a valid email address"
+            ]
         },
 
         address: {

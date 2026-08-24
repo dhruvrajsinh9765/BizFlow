@@ -2,22 +2,33 @@ const categoryService = require("../services/categoryService");
 
 const createCategory = async (req, res) => {
     const result = await categoryService.createCategory(
-        req.user.id,
+        req.user._id,
         req.body
+    );
+
+    res.status(201).send(result);
+};
+
+const getCategories = async (req, res) => {
+    const result = await categoryService.getCategories(
+        req.user._id
     );
 
     res.send(result);
 };
 
-const getCategories = async (req, res) => {
-    const result = await categoryService.getCategories(req.user.id);
+const getCategoryById = async (req, res) => {
+    const result = await categoryService.getCategoryById(
+        req.user._id,
+        req.params.id
+    );
 
     res.send(result);
 };
 
 const updateCategory = async (req, res) => {
     const result = await categoryService.updateCategory(
-        req.user.id,
+        req.user._id,
         req.params.id,
         req.body
     );
@@ -27,7 +38,7 @@ const updateCategory = async (req, res) => {
 
 const deleteCategory = async (req, res) => {
     const result = await categoryService.deleteCategory(
-        req.user.id,
+        req.user._id,
         req.params.id
     );
 
@@ -37,7 +48,7 @@ const deleteCategory = async (req, res) => {
 module.exports = {
     createCategory,
     getCategories,
+    getCategoryById,
     updateCategory,
     deleteCategory
 };
-

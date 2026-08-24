@@ -2,16 +2,16 @@ const transactionService = require("../services/transactionService");
 
 const createTransaction = async (req, res) => {
     const result = await transactionService.createTransaction(
-        req.user.id,
+        req.user._id,
         req.body
     );
 
-    res.send(result);
+    res.status(201).send(result);
 };
 
 const getTransactions = async (req, res) => {
     const result = await transactionService.getTransactions(
-        req.user.id,
+        req.user._id,
         req.query
     );
 
@@ -20,7 +20,7 @@ const getTransactions = async (req, res) => {
 
 const getTransactionById = async (req, res) => {
     const result = await transactionService.getTransactionById(
-        req.user.id,
+        req.user._id,
         req.params.id
     );
 
@@ -29,7 +29,7 @@ const getTransactionById = async (req, res) => {
 
 const updateTransaction = async (req, res) => {
     const result = await transactionService.updateTransaction(
-        req.user.id,
+        req.user._id,
         req.params.id,
         req.body
     );
@@ -39,7 +39,7 @@ const updateTransaction = async (req, res) => {
 
 const deleteTransaction = async (req, res) => {
     const result = await transactionService.deleteTransaction(
-        req.user.id,
+        req.user._id,
         req.params.id
     );
 
@@ -53,4 +53,3 @@ module.exports = {
     updateTransaction,
     deleteTransaction
 };
-
