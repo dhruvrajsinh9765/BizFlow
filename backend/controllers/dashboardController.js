@@ -2,7 +2,7 @@ const dashboardService = require("../services/dashboardService");
 
 const getDashboardSummary = async (req, res) => {
     const result = await dashboardService.getDashboardSummary(
-        req.user.id
+        req.user._id
     );
 
     res.send(result);
@@ -10,7 +10,7 @@ const getDashboardSummary = async (req, res) => {
 
 const getFinancialAnalytics = async (req, res) => {
     const result = await dashboardService.getFinancialAnalytics(
-        req.user.id,
+        req.user._id,
         req.query
     );
 

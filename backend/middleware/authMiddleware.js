@@ -1,40 +1,52 @@
 const User = require("../models/User");
 const { verifyAccessToken } = require("../utils/tokenUtils");
+const AppError = require("../utils/Apperror");
 
 const protect = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
 
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            res.status(401);
-            throw new Error("Not authorized, token missing");
+            throw new AppError(
+                "Authorization token is missing",
+                401
+            );
         }
 
         const token = authHeader.split(" ")[1];
 
-        const decoded = verifyAccessToken(token);
+        let decoded;
 
-        const user = await User.findById(decoded.id).select("-password");
+        try {
+            decoded = verifyAccessToken(token);
+        } catch (error) {
+            if (error.name === "TokenExpiredError") {
+                throw new AppError(
+                    "Access token has expired",
+                    401
+                );
+            }
+
+            throw new AppError(
+                "Invalid access token",
+                401
+            );
+        }
+
+        const user = await User.findById(decoded.id)
+            .select("-password");
 
         if (!user) {
-            res.status(401);
-            throw new Error("Not authorized, user not found");
+            throw new AppError(
+                "User associated with this token was not found",
+                401
+            );
         }
 
         req.user = user;
 
         next();
     } catch (error) {
-        if (error.name === "JsonWebTokenError") {
-            res.status(401);
-            error.message = "Not authorized, invalid token";
-        }
-
-        if (error.name === "TokenExpiredError") {
-            res.status(401);
-            error.message = "Not authorized, token expired";
-        }
-
         next(error);
     }
 };

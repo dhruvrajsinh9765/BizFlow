@@ -65,6 +65,12 @@ const logoutFromAllDevices = async (req, res) => {
         req.user._id
     );
 
+    res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax"
+    });
+
     res.send(result);
 };
 
