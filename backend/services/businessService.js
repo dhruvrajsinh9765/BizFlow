@@ -6,7 +6,7 @@ const createBusiness = async (userId, businessData) => {
 
     if (existingBusiness) {
         throw new AppError(
-            "Business already exists for this user",
+            "You have already created a business profile",
             409
         );
     }
@@ -49,27 +49,24 @@ const updateBusiness = async (userId, businessData) => {
 
     const fieldsToUpdate = Object.keys(businessData);
 
-    // Empty body
     if (fieldsToUpdate.length === 0) {
         throw new AppError(
-            "At least one field is required to update the business",
+            "Please provide at least one field to update",
             400
         );
     }
 
-    // Check whether at least one valid field is provided
     const validFields = fieldsToUpdate.filter((field) =>
         allowedFields.includes(field)
     );
 
     if (validFields.length === 0) {
         throw new AppError(
-            "No valid fields provided for update",
+            "Please provide valid business details to update",
             400
         );
     }
 
-    // Update only allowed fields
     validFields.forEach((field) => {
         business[field] = businessData[field];
     });

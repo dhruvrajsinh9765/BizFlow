@@ -11,14 +11,17 @@ const {
 } = require("../utils/tokenUtils");
 
 
-const registerUser = async (userData) => {
+const registerUser = async (userData = {}) => {
     const { name, email, password } = userData;
 
     // Validate required fields
     if (
-        !name?.trim() ||
-        !email?.trim() ||
-        !password?.trim()
+        typeof name !== "string" ||
+        !name.trim() ||
+        typeof email !== "string" ||
+        !email.trim() ||
+        typeof password !== "string" ||
+        !password.trim()
     ) {
         throw new AppError(
             "Name, email and password are required",
@@ -59,11 +62,16 @@ const registerUser = async (userData) => {
 };
 
 
-const loginUser = async (userData) => {
+const loginUser = async (userData = {}) => {
     const { email, password } = userData;
 
     // Validate required fields
-    if (!email || !password) {
+    if (
+        typeof email !== "string" ||
+        !email.trim() ||
+        typeof password !== "string" ||
+        !password.trim()
+    ) {
         throw new AppError(
             "Email and password are required",
             400
@@ -244,8 +252,30 @@ const getUserProfile = async (userId) => {
 };
 
 
-const updateUserProfile = async (userId, userData) => {
-    const { name, email, password } = userData;
+const updateUserProfile = async (userId, userData = {}) => {
+    const allowedFields = ["name", "email", "password"];
+
+    const fieldsToUpdate = Object.keys(userData);
+
+    // Empty request body
+    if (fieldsToUpdate.length === 0) {
+        throw new AppError(
+            "Please provide at least one field to update",
+            400
+        );
+    }
+
+    const validFields = fieldsToUpdate.filter((field) =>
+        allowedFields.includes(field)
+    );
+
+    // Only invalid fields were provided
+    if (validFields.length === 0) {
+        throw new AppError(
+            "Please provide valid profile details to update",
+            400
+        );
+    }
 
     const user = await User.findById(userId);
 
@@ -253,7 +283,48 @@ const updateUserProfile = async (userId, userData) => {
         throw new AppError("User not found", 404);
     }
 
-    if (email && email !== user.email) {
+    const { name, email, password } = userData;
+
+    if (
+        name !== undefined &&
+        (
+            typeof name !== "string" ||
+            !name.trim()
+        )
+    ) {
+        throw new AppError(
+            "Name cannot be empty",
+            400
+        );
+    }
+
+    if (
+        email !== undefined &&
+        (
+            typeof email !== "string" ||
+            !email.trim()
+        )
+    ) {
+        throw new AppError(
+            "Email cannot be empty",
+            400
+        );
+    }
+
+    if (
+        password !== undefined &&
+        (
+            typeof password !== "string" ||
+            !password.trim()
+        )
+    ) {
+        throw new AppError(
+            "Password cannot be empty",
+            400
+        );
+    }
+
+    if (email !== undefined && email !== user.email) {
         const existingUser = await User.findOne({ email });
 
         if (existingUser) {
@@ -263,25 +334,25 @@ const updateUserProfile = async (userId, userData) => {
         user.email = email;
     }
 
-    if (name) {
+    if (name !== undefined) {
         user.name = name;
     }
 
-    if (password) {
-    if (password.length < 6) {
-        throw new AppError(
-            "Password must be at least 6 characters long",
-            400
-        );
+    if (password !== undefined) {
+        if (password.length < 6) {
+            throw new AppError(
+                "Password must be at least 6 characters long",
+                400
+            );
+        }
+
+        user.password = await bcrypt.hash(password, 10);
+
+        // Password change invalidates all existing sessions
+        await Session.deleteMany({
+            userId
+        });
     }
-
-    user.password = await bcrypt.hash(password, 10);
-
-    // Password change invalidates all existing sessions
-    await Session.deleteMany({
-        userId
-    });
-}
 
     const updatedUser = await user.save();
 

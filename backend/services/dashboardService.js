@@ -1,17 +1,13 @@
 const Business = require("../models/Business");
 const Transaction = require("../models/Transaction");
+const AppError = require("../utils/Apperror");
 
-const createBadRequestError = (message) => {
-    const error = new Error(message);
-    error.statusCode = 400;
-    return error;
-};
 
 const getDashboardSummary = async (userId) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
     const businessId = business._id;
@@ -121,11 +117,12 @@ const getDashboardSummary = async (userId) => {
     };
 };
 
-const getFinancialAnalytics = async (userId, filters) => {
+
+const getFinancialAnalytics = async (userId, filters = {}) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        throw new Error("Business not found");
+        throw new AppError("Business not found", 404);
     }
 
     const {
@@ -142,7 +139,7 @@ const getFinancialAnalytics = async (userId, filters) => {
         parsedStartDate = new Date(startDate);
 
         if (Number.isNaN(parsedStartDate.getTime())) {
-            throw createBadRequestError("Invalid start date");
+            throw new AppError("Invalid start date", 400);
         }
     }
 
@@ -153,7 +150,7 @@ const getFinancialAnalytics = async (userId, filters) => {
         parsedEndDate = new Date(endDate);
 
         if (Number.isNaN(parsedEndDate.getTime())) {
-            throw createBadRequestError("Invalid end date");
+            throw new AppError("Invalid end date", 400);
         }
     }
 
@@ -163,8 +160,9 @@ const getFinancialAnalytics = async (userId, filters) => {
         parsedEndDate !== undefined &&
         parsedStartDate > parsedEndDate
     ) {
-        throw createBadRequestError(
-            "Start date cannot be later than end date"
+        throw new AppError(
+            "Start date cannot be later than end date",
+            400
         );
     }
 
@@ -405,6 +403,7 @@ const getFinancialAnalytics = async (userId, filters) => {
         categorySummary
     };
 };
+
 
 module.exports = {
     getDashboardSummary,

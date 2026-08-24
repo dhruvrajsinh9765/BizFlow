@@ -6,17 +6,16 @@ const createCategory = async (userId, categoryData = {}) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        const error = new Error("Business not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Business not found", 404);
     }
 
     const { name, type } = categoryData;
 
     if (name === undefined && type === undefined) {
-        const error = new Error("Name and type are required");
-        error.statusCode = 400;
-        throw error;
+        throw new AppError(
+            "Please provide both category name and type",
+            400
+        );
     }
 
     const category = await Category.create({
@@ -79,7 +78,7 @@ const updateCategory = async (userId, categoryId, categoryData) => {
 
     if (fieldsToUpdate.length === 0) {
         throw new AppError(
-            "At least one field is required to update the category",
+            "Please provide at least one field to update",
             400
         );
     }
@@ -90,7 +89,7 @@ const updateCategory = async (userId, categoryId, categoryData) => {
 
     if (validFields.length === 0) {
         throw new AppError(
-            "No valid fields provided for update",
+            "Please provide valid category details to update",
             400
         );
     }

@@ -3,11 +3,33 @@ const BusinessContact = require("../models/BusinessContact");
 const AppError = require("../utils/Apperror");
 
 
-const createBusinessContact = async (userId, contactData) => {
+const createBusinessContact = async (userId, contactData = {}) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
         throw new AppError("Business not found", 404);
+    }
+
+    const fields = Object.keys(contactData);
+
+    // Empty request body
+    if (fields.length === 0) {
+        throw new AppError(
+            "Please provide contact details",
+            400
+        );
+    }
+
+    // Required field
+    if (
+        contactData.name === undefined ||
+        contactData.name === null ||
+        contactData.name.trim() === ""
+    ) {
+        throw new AppError(
+            "Contact name is required",
+            400
+        );
     }
 
     const contact = await BusinessContact.create({
@@ -50,7 +72,7 @@ const getBusinessContactById = async (userId, contactId) => {
     });
 
     if (!contact) {
-        throw new AppError("Business contact not found", 404);
+        throw new AppError("Contact not found", 404);
     }
 
     return contact;
@@ -60,7 +82,7 @@ const getBusinessContactById = async (userId, contactId) => {
 const updateBusinessContact = async (
     userId,
     contactId,
-    contactData
+    contactData = {}
 ) => {
     const business = await Business.findOne({ userId });
 
@@ -75,25 +97,24 @@ const updateBusinessContact = async (
         "address"
     ];
 
-    const fieldsToUpdate = Object.keys(contactData || {});
+    const fieldsToUpdate = Object.keys(contactData);
 
     // Empty request body
     if (fieldsToUpdate.length === 0) {
         throw new AppError(
-            "At least one field is required to update the business contact",
+            "Please provide at least one field to update",
             400
         );
     }
 
-    // Keep only valid fields
     const validFields = fieldsToUpdate.filter((field) =>
         allowedFields.includes(field)
     );
 
-    // Only unknown fields were provided
+    // Only invalid fields were provided
     if (validFields.length === 0) {
         throw new AppError(
-            "No valid fields provided for update",
+            "Please provide valid contact details to update",
             400
         );
     }
@@ -103,6 +124,20 @@ const updateBusinessContact = async (
     validFields.forEach((field) => {
         updateData[field] = contactData[field];
     });
+
+    // Do not allow an empty contact name
+    if (
+        updateData.name !== undefined &&
+        (
+            updateData.name === null ||
+            updateData.name.trim() === ""
+        )
+    ) {
+        throw new AppError(
+            "Contact name cannot be empty",
+            400
+        );
+    }
 
     const contact = await BusinessContact.findOneAndUpdate(
         {
@@ -117,7 +152,7 @@ const updateBusinessContact = async (
     );
 
     if (!contact) {
-        throw new AppError("Business contact not found", 404);
+        throw new AppError("Contact not found", 404);
     }
 
     return {
@@ -140,7 +175,7 @@ const deleteBusinessContact = async (userId, contactId) => {
     });
 
     if (!contact) {
-        throw new AppError("Business contact not found", 404);
+        throw new AppError("Contact not found", 404);
     }
 
     return {

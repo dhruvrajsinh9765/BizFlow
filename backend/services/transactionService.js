@@ -2,14 +2,13 @@ const Business = require("../models/Business");
 const Category = require("../models/Category");
 const BusinessContact = require("../models/BusinessContact");
 const Transaction = require("../models/Transaction");
+const AppError = require("../utils/Apperror");
 
-const createTransaction = async (userId, transactionData) => {
+const createTransaction = async (userId, transactionData = {}) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        const error = new Error("Business not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Business not found", 404);
     }
 
     const {
@@ -22,21 +21,21 @@ const createTransaction = async (userId, transactionData) => {
     } = transactionData;
 
     if (!categoryId) {
-        const error = new Error("Category is required");
-        error.statusCode = 400;
-        throw error;
+        throw new AppError("Please select a category", 400);
     }
 
     if (amount === undefined || amount === null) {
-        const error = new Error("Transaction amount is required");
-        error.statusCode = 400;
-        throw error;
+        throw new AppError(
+            "Please provide a transaction amount",
+            400
+        );
     }
 
     if (paymentMethod === undefined || paymentMethod === null) {
-        const error = new Error("Payment method is required");
-        error.statusCode = 400;
-        throw error;
+        throw new AppError(
+            "Please select a payment method",
+            400
+        );
     }
 
     // Verify that the category belongs to this business
@@ -46,9 +45,7 @@ const createTransaction = async (userId, transactionData) => {
     });
 
     if (!category) {
-        const error = new Error("Category not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Category not found", 404);
     }
 
     // Verify contact ownership if a contact is provided
@@ -59,9 +56,7 @@ const createTransaction = async (userId, transactionData) => {
         });
 
         if (!contact) {
-            const error = new Error("Business contact not found");
-            error.statusCode = 404;
-            throw error;
+            throw new AppError("Contact not found", 404);
         }
     }
 
@@ -81,13 +76,12 @@ const createTransaction = async (userId, transactionData) => {
     };
 };
 
+
 const getTransactions = async (userId, filters) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        const error = new Error("Business not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Business not found", 404);
     }
 
     const {
@@ -106,15 +100,17 @@ const getTransactions = async (userId, filters) => {
     const limitNumber = Number(limit);
 
     if (!Number.isInteger(pageNumber) || pageNumber < 1) {
-        const error = new Error("Page must be a positive integer");
-        error.statusCode = 400;
-        throw error;
+        throw new AppError(
+            "Page must be a positive whole number",
+            400
+        );
     }
 
     if (!Number.isInteger(limitNumber) || limitNumber < 1) {
-        const error = new Error("Limit must be a positive integer");
-        error.statusCode = 400;
-        throw error;
+        throw new AppError(
+            "Limit must be a positive whole number",
+            400
+        );
     }
 
     if (paymentMethod !== undefined) {
@@ -127,9 +123,10 @@ const getTransactions = async (userId, filters) => {
         ];
 
         if (!allowedPaymentMethods.includes(paymentMethod)) {
-            const error = new Error("Invalid payment method");
-            error.statusCode = 400;
-            throw error;
+            throw new AppError(
+                "Please provide a valid payment method",
+                400
+            );
         }
     }
 
@@ -137,9 +134,10 @@ const getTransactions = async (userId, filters) => {
         order !== undefined &&
         !["asc", "desc"].includes(order)
     ) {
-        const error = new Error("Order must be either asc or desc");
-        error.statusCode = 400;
-        throw error;
+        throw new AppError(
+            "Order must be either asc or desc",
+            400
+        );
     }
 
     if (sortBy !== undefined) {
@@ -149,9 +147,10 @@ const getTransactions = async (userId, filters) => {
         ];
 
         if (!allowedSortFields.includes(sortBy)) {
-            const error = new Error("Invalid sort field");
-            error.statusCode = 400;
-            throw error;
+            throw new AppError(
+                "Please provide a valid field to sort by",
+                400
+            );
         }
     }
 
@@ -162,30 +161,25 @@ const getTransactions = async (userId, filters) => {
         start = new Date(startDate);
 
         if (Number.isNaN(start.getTime())) {
-            const error = new Error("Invalid start date");
-            error.statusCode = 400;
-            throw error;
+            throw new AppError("Invalid start date", 400);
         }
     }
 
     if (endDate !== undefined) {
-    end = new Date(endDate);
+        end = new Date(endDate);
 
-    if (Number.isNaN(end.getTime())) {
-        const error = new Error("Invalid end date");
-        error.statusCode = 400;
-        throw error;
-    }
+        if (Number.isNaN(end.getTime())) {
+            throw new AppError("Invalid end date", 400);
+        }
 
-    end.setUTCHours(23, 59, 59, 999);
+        end.setUTCHours(23, 59, 59, 999);
     }
 
     if (start && end && start > end) {
-        const error = new Error(
-            "Start date cannot be after end date"
+        throw new AppError(
+            "Start date cannot be after end date",
+            400
         );
-        error.statusCode = 400;
-        throw error;
     }
 
     const skip = (pageNumber - 1) * limitNumber;
@@ -248,13 +242,12 @@ const getTransactions = async (userId, filters) => {
     };
 };
 
+
 const getTransactionById = async (userId, transactionId) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        const error = new Error("Business not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Business not found", 404);
     }
 
     const transaction = await Transaction.findOne({
@@ -263,25 +256,22 @@ const getTransactionById = async (userId, transactionId) => {
     });
 
     if (!transaction) {
-        const error = new Error("Transaction not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Transaction not found", 404);
     }
 
     return transaction;
 };
 
+
 const updateTransaction = async (
     userId,
     transactionId,
-    transactionData
+    transactionData = {}
 ) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        const error = new Error("Business not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Business not found", 404);
     }
 
     const allowedFields = [
@@ -296,11 +286,10 @@ const updateTransaction = async (
     const providedFields = Object.keys(transactionData);
 
     if (providedFields.length === 0) {
-        const error = new Error(
-            "At least one field is required to update the transaction"
+        throw new AppError(
+            "Please provide at least one field to update",
+            400
         );
-        error.statusCode = 400;
-        throw error;
     }
 
     const validFields = providedFields.filter((field) =>
@@ -308,11 +297,10 @@ const updateTransaction = async (
     );
 
     if (validFields.length === 0) {
-        const error = new Error(
-            "No valid fields provided for update"
+        throw new AppError(
+            "Please provide valid transaction details to update",
+            400
         );
-        error.statusCode = 400;
-        throw error;
     }
 
     const {
@@ -333,9 +321,7 @@ const updateTransaction = async (
         });
 
         if (!category) {
-            const error = new Error("Category not found");
-            error.statusCode = 404;
-            throw error;
+            throw new AppError("Category not found", 404);
         }
 
         updateData.categoryId = categoryId;
@@ -351,11 +337,7 @@ const updateTransaction = async (
             });
 
             if (!contact) {
-                const error = new Error(
-                    "Business contact not found"
-                );
-                error.statusCode = 404;
-                throw error;
+                throw new AppError("Contact not found", 404);
             }
 
             updateData.contactId = contactId;
@@ -391,9 +373,7 @@ const updateTransaction = async (
     );
 
     if (!transaction) {
-        const error = new Error("Transaction not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Transaction not found", 404);
     }
 
     return {
@@ -402,13 +382,12 @@ const updateTransaction = async (
     };
 };
 
+
 const deleteTransaction = async (userId, transactionId) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
-        const error = new Error("Business not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Business not found", 404);
     }
 
     const transaction = await Transaction.findOneAndDelete({
@@ -417,15 +396,14 @@ const deleteTransaction = async (userId, transactionId) => {
     });
 
     if (!transaction) {
-        const error = new Error("Transaction not found");
-        error.statusCode = 404;
-        throw error;
+        throw new AppError("Transaction not found", 404);
     }
 
     return {
         message: "Transaction deleted successfully"
     };
 };
+
 
 module.exports = {
     createTransaction,
