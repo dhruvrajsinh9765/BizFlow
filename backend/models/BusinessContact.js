@@ -41,7 +41,14 @@ const businessContactSchema = new mongoose.Schema(
         isActive: {
             type: Boolean,
             default: true
+        },
+
+        contactType: {
+            type: String,
+            enum: ["customer", "supplier"],
+            required: [true, "Contact type is required"]
         }
+
     },
     {
         timestamps: true

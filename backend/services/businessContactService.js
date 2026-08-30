@@ -92,6 +92,7 @@ const updateBusinessContact = async (
 
     const allowedFields = [
         "name",
+        "contactType",
         "phone",
         "email",
         "address"
