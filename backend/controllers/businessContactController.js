@@ -11,7 +11,8 @@ const createBusinessContact = async (req, res) => {
 
 const getBusinessContacts = async (req, res) => {
     const result = await businessContactService.getBusinessContacts(
-        req.user._id
+        req.user._id,
+        req.query
     );
 
     res.send(result);

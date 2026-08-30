@@ -42,17 +42,32 @@ const createBusinessContact = async (userId, contactData = {}) => {
 };
 
 
-const getBusinessContacts = async (userId) => {
+const getBusinessContacts = async (userId, filters = {}) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {
         throw new AppError("Business not found", 404);
     }
 
-    const contacts = await BusinessContact.find({
+    const { contactType } = filters;
+
+    const query = {
         businessId: business._id,
         isActive: true
-    });
+    };
+
+    if (contactType !== undefined) {
+        if (!["customer", "supplier"].includes(contactType)) {
+            throw new AppError(
+                "Contact type must be either customer or supplier",
+                400
+            );
+        }
+
+        query.contactType = contactType;
+    }
+
+    const contacts = await BusinessContact.find(query);
 
     return contacts;
 };
