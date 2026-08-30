@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Session = require("../models/Session");
 const { verifyAccessToken } = require("../utils/tokenUtils");
 const AppError = require("../utils/Apperror");
 
@@ -29,6 +30,18 @@ const protect = async (req, res, next) => {
 
             throw new AppError(
                 "Invalid access token",
+                401
+            );
+        }
+
+        const session = await Session.findOne({
+            _id: decoded.sessionId,
+            userId: decoded.id
+        });
+
+        if (!session) {
+            throw new AppError(
+                "Session has expired or been invalidated",
                 401
             );
         }

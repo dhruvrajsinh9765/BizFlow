@@ -100,7 +100,10 @@ const loginUser = async (userData = {}) => {
     // Generate sessionId before creating the session
     const sessionId = new mongoose.Types.ObjectId();
 
-    const accessToken = generateAccessToken(user._id);
+    const accessToken = generateAccessToken(
+        user._id,
+        sessionId
+    );
 
     // Refresh token contains both userId and sessionId
     const refreshToken = generateRefreshToken(
@@ -176,7 +179,10 @@ const refreshAccessToken = async (refreshToken) => {
         throw new AppError("User not found", 404);
     }
 
-    const accessToken = generateAccessToken(user._id);
+    const accessToken = generateAccessToken(
+        user._id,
+        decoded.sessionId
+    );
 
     return {
         message: "Access token refreshed successfully",
