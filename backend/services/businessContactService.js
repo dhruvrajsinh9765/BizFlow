@@ -12,7 +12,6 @@ const createBusinessContact = async (userId, contactData = {}) => {
 
     const fields = Object.keys(contactData);
 
-    // Empty request body
     if (fields.length === 0) {
         throw new AppError(
             "Please provide contact details",
@@ -20,7 +19,6 @@ const createBusinessContact = async (userId, contactData = {}) => {
         );
     }
 
-    // Required field
     if (
         contactData.name === undefined ||
         contactData.name === null ||
@@ -52,7 +50,8 @@ const getBusinessContacts = async (userId) => {
     }
 
     const contacts = await BusinessContact.find({
-        businessId: business._id
+        businessId: business._id,
+        isActive: true
     });
 
     return contacts;
@@ -68,7 +67,8 @@ const getBusinessContactById = async (userId, contactId) => {
 
     const contact = await BusinessContact.findOne({
         _id: contactId,
-        businessId: business._id
+        businessId: business._id,
+        isActive: true
     });
 
     if (!contact) {
@@ -99,7 +99,6 @@ const updateBusinessContact = async (
 
     const fieldsToUpdate = Object.keys(contactData);
 
-    // Empty request body
     if (fieldsToUpdate.length === 0) {
         throw new AppError(
             "Please provide at least one field to update",
@@ -111,7 +110,6 @@ const updateBusinessContact = async (
         allowedFields.includes(field)
     );
 
-    // Only invalid fields were provided
     if (validFields.length === 0) {
         throw new AppError(
             "Please provide valid contact details to update",
@@ -125,7 +123,6 @@ const updateBusinessContact = async (
         updateData[field] = contactData[field];
     });
 
-    // Do not allow an empty contact name
     if (
         updateData.name !== undefined &&
         (
@@ -142,7 +139,8 @@ const updateBusinessContact = async (
     const contact = await BusinessContact.findOneAndUpdate(
         {
             _id: contactId,
-            businessId: business._id
+            businessId: business._id,
+            isActive: true
         },
         updateData,
         {
@@ -169,10 +167,19 @@ const deleteBusinessContact = async (userId, contactId) => {
         throw new AppError("Business not found", 404);
     }
 
-    const contact = await BusinessContact.findOneAndDelete({
-        _id: contactId,
-        businessId: business._id
-    });
+    const contact = await BusinessContact.findOneAndUpdate(
+        {
+            _id: contactId,
+            businessId: business._id,
+            isActive: true
+        },
+        {
+            isActive: false
+        },
+        {
+            returnDocument: "after"
+        }
+    );
 
     if (!contact) {
         throw new AppError("Contact not found", 404);

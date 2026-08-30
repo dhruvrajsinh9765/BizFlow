@@ -1,6 +1,8 @@
 const Business = require("../models/Business");
 const Category = require("../models/Category");
+const Transaction = require("../models/Transaction");
 const AppError = require("../utils/Apperror");
+
 
 const createCategory = async (userId, categoryData = {}) => {
     const business = await Business.findOne({ userId });
@@ -130,7 +132,7 @@ const deleteCategory = async (userId, categoryId) => {
         throw new AppError("Business not found", 404);
     }
 
-    const category = await Category.findOneAndDelete({
+    const category = await Category.findOne({
         _id: categoryId,
         businessId: business._id
     });
@@ -138,6 +140,16 @@ const deleteCategory = async (userId, categoryId) => {
     if (!category) {
         throw new AppError("Category not found", 404);
     }
+
+    // Delete all transactions related to this category
+    await Transaction.deleteMany({
+        categoryId: category._id
+    });
+
+    // Delete the category
+    await Category.deleteOne({
+        _id: category._id
+    });
 
     return {
         message: "Category deleted successfully"

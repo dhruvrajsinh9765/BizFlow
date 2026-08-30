@@ -52,7 +52,8 @@ const createTransaction = async (userId, transactionData = {}) => {
     if (contactId) {
         const contact = await BusinessContact.findOne({
             _id: contactId,
-            businessId: business._id
+            businessId: business._id,
+            isActive: true
         });
 
         if (!contact) {
@@ -333,7 +334,8 @@ const updateTransaction = async (
         } else {
             const contact = await BusinessContact.findOne({
                 _id: contactId,
-                businessId: business._id
+                businessId: business._id,
+                isActive: true
             });
 
             if (!contact) {
