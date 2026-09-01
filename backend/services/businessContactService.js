@@ -20,15 +20,16 @@ const createBusinessContact = async (userId, contactData = {}) => {
     }
 
     if (
-        contactData.name === undefined ||
-        contactData.name === null ||
-        contactData.name.trim() === ""
+        typeof contactData.name !== "string" ||
+        !contactData.name.trim()
     ) {
         throw new AppError(
             "Contact name is required",
-            400
-        );
-    }
+             400
+    );
+}
+
+
 
     const contact = await BusinessContact.create({
         ...contactData,
@@ -142,15 +143,17 @@ const updateBusinessContact = async (
     if (
         updateData.name !== undefined &&
         (
-            updateData.name === null ||
-            updateData.name.trim() === ""
+            typeof updateData.name !== "string" ||
+            !updateData.name.trim()
         )
     ) {
         throw new AppError(
-            "Contact name cannot be empty",
-            400
-        );
-    }
+         "Contact name cannot be empty",
+          400
+    );
+}
+
+
 
     const contact = await BusinessContact.findOneAndUpdate(
         {

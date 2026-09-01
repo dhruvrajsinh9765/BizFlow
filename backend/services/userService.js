@@ -37,7 +37,9 @@ const registerUser = async (userData = {}) => {
         );
     }
 
-    const existingUser = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
         throw new AppError("User already exists", 409);
@@ -47,7 +49,7 @@ const registerUser = async (userData = {}) => {
 
     const user = await User.create({
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword
     });
 
@@ -78,7 +80,8 @@ const loginUser = async (userData = {}) => {
         );
     }
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
         throw new AppError("Invalid email or password", 401);
@@ -330,15 +333,23 @@ const updateUserProfile = async (userId, userData = {}) => {
         );
     }
 
-    if (email !== undefined && email !== user.email) {
-        const existingUser = await User.findOne({ email });
+    if (email !== undefined) {
+        const normalizedEmail = email.trim().toLowerCase();
+
+        if (normalizedEmail !== user.email) {
+         const existingUser = await User.findOne({
+            email: normalizedEmail
+        });
 
         if (existingUser) {
             throw new AppError("Email already exists", 409);
         }
 
-        user.email = email;
+        user.email = normalizedEmail;
     }
+}
+
+
 
     if (name !== undefined) {
         user.name = name;

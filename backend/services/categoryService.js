@@ -13,7 +13,7 @@ const createCategory = async (userId, categoryData = {}) => {
 
     const { name, type } = categoryData;
 
-    if (name === undefined && type === undefined) {
+    if (name === undefined || type === undefined) {
         throw new AppError(
             "Please provide both category name and type",
             400
