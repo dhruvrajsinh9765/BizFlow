@@ -3,7 +3,7 @@ import request from "supertest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const app = require("../app");
+const app = require("../../app");
 
 describe("Root API", () => {
     test("GET / should return backend running message", async () => {
