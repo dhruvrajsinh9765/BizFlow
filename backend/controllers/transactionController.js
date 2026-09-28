@@ -1,4 +1,5 @@
 const transactionService = require("../services/transactionService");
+const transactionImportService = require("../services/transactionImportService");
 
 const createTransaction = async (req, res) => {
     const result = await transactionService.createTransaction(
@@ -46,10 +47,20 @@ const deleteTransaction = async (req, res) => {
     res.send(result);
 };
 
+const importTransactions = async (req, res) => {
+    const result = await transactionImportService.importTransactions(
+        req.user._id,
+        req.body
+    );
+
+    res.send(result);
+};
+
 module.exports = {
     createTransaction,
     getTransactions,
     getTransactionById,
     updateTransaction,
-    deleteTransaction
+    deleteTransaction,
+    importTransactions
 };

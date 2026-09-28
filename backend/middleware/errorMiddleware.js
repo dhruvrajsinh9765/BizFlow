@@ -40,10 +40,16 @@ const errorHandler = (err, req, res, next) => {
         message = "Duplicate value already exists";
     }
 
-    res.status(statusCode).json({
-        success: false,
-        message
-    });
+    const response = {
+    success: false,
+    message
+};
+
+if (err.details) {
+    Object.assign(response, err.details);
+}
+
+res.status(statusCode).json(response);
 };
 
 module.exports = errorHandler;

@@ -15,6 +15,7 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+app.use(express.text({ type: ["text/csv", "text/plain"] }));
 app.use(cookieParser());
 
 app.get("/", (req, res) => {
