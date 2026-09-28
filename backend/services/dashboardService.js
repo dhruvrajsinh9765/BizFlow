@@ -2,6 +2,10 @@ const Business = require("../models/Business");
 const Transaction = require("../models/Transaction");
 const AppError = require("../utils/Apperror");
 
+const {
+    getStartOfDayIST,
+    getEndOfDayIST
+} = require("../utils/dateUtils");
 
 const getDashboardSummary = async (userId) => {
     const business = await Business.findOne({ userId });
@@ -135,26 +139,30 @@ const getFinancialAnalytics = async (userId, filters = {}) => {
     // Validate start date
     let parsedStartDate;
 
-    if (startDate !== undefined) {
-        parsedStartDate = new Date(startDate);
+if (startDate !== undefined) {
+    parsedStartDate = getStartOfDayIST(startDate);
 
-        if (Number.isNaN(parsedStartDate.getTime())) {
-            throw new AppError("Invalid start date", 400);
-        }
+    if (!parsedStartDate) {
+        throw new AppError(
+            "Invalid start date. Use YYYY-MM-DD format",
+            400
+        );
     }
+}
 
-    // Validate end date
-    let parsedEndDate;
 
-    if (endDate !== undefined) {
-        parsedEndDate = new Date(endDate);
+let parsedEndDate;
 
-        if (Number.isNaN(parsedEndDate.getTime())) {
-            throw new AppError("Invalid end date", 400);
-        }
+if (endDate !== undefined) {
+    parsedEndDate = getEndOfDayIST(endDate);
 
-        parsedEndDate.setHours(23, 59, 59, 999);
+    if (!parsedEndDate) {
+        throw new AppError(
+            "Invalid end date. Use YYYY-MM-DD format",
+            400
+        );
     }
+}
 
     // Validate date range
     if (
@@ -242,21 +250,25 @@ const getFinancialAnalytics = async (userId, filters = {}) => {
         },
         {
             $group: {
-                _id: {
-                    year: {
-                        $year: "$transactionDate",
-                        timezone: "Asia/Kolkata"
-                    },
-                    month: {
-                        $month: "$transactionDate",
-                        timezone: "Asia/Kolkata"
-                    },
-                    type: "$category.type"
-                },
-                total: {
-                    $sum: "$amount"
-                }
+    _id: {
+        year: {
+            $year: {
+                date: "$transactionDate",
+                timezone: "Asia/Kolkata"
             }
+        },
+        month: {
+            $month: {
+                date: "$transactionDate",
+                timezone: "Asia/Kolkata"
+            }
+        },
+        type: "$category.type"
+    },
+    total: {
+        $sum: "$amount"
+    }
+}
         },
         {
             $group: {

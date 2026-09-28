@@ -4,6 +4,11 @@ const BusinessContact = require("../models/BusinessContact");
 const Transaction = require("../models/Transaction");
 const AppError = require("../utils/Apperror");
 
+const {
+    getStartOfDayIST,
+    getEndOfDayIST
+} = require("../utils/dateUtils");
+
 const createTransaction = async (userId, transactionData = {}) => {
     const business = await Business.findOne({ userId });
 
@@ -160,25 +165,29 @@ const getTransactions = async (userId, filters) => {
     }
 
     let start;
-    let end;
+let end;
 
-    if (startDate !== undefined) {
-        start = new Date(startDate);
+if (startDate !== undefined) {
+    start = getStartOfDayIST(startDate);
 
-        if (Number.isNaN(start.getTime())) {
-            throw new AppError("Invalid start date", 400);
-        }
+    if (!start) {
+        throw new AppError(
+            "Invalid start date. Use YYYY-MM-DD format",
+            400
+        );
     }
+}
 
-    if (endDate !== undefined) {
-        end = new Date(endDate);
+if (endDate !== undefined) {
+    end = getEndOfDayIST(endDate);
 
-        if (Number.isNaN(end.getTime())) {
-            throw new AppError("Invalid end date", 400);
-        }
-
-        end.setUTCHours(23, 59, 59, 999);
+    if (!end) {
+        throw new AppError(
+            "Invalid end date. Use YYYY-MM-DD format",
+            400
+        );
     }
+}
 
     if (start && end && start > end) {
         throw new AppError(
