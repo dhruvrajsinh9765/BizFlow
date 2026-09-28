@@ -11,7 +11,8 @@ const businessContactSchema = new mongoose.Schema(
         name: {
             type: String,
             required: [true, "Contact name is required"],
-            trim: true
+            trim: true,
+            minlength: [1, "Contact name cannot be empty"]
         },
 
         phone: {

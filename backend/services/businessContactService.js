@@ -31,8 +31,24 @@ const createBusinessContact = async (userId, contactData = {}) => {
 
 
 
+    const allowedFields = [
+    "name",
+    "contactType",
+    "phone",
+    "email",
+    "address"
+    ];
+
+    const contactDataToCreate = {};
+
+    allowedFields.forEach((field) => {
+        if (contactData[field] !== undefined) {
+            contactDataToCreate[field] = contactData[field];
+            }
+    });
+
     const contact = await BusinessContact.create({
-        ...contactData,
+        ...contactDataToCreate,
         businessId: business._id
     });
 

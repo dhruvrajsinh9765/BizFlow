@@ -42,7 +42,7 @@ const getCategories = async (userId) => {
 
     const categories = await Category.find({
         businessId: business._id
-    });
+    }).sort({ name: 1 });
 
     return categories;
 };
@@ -96,13 +96,39 @@ const updateCategory = async (userId, categoryId, categoryData) => {
         );
     }
 
+    const category = await Category.findOne({
+        _id: categoryId,
+        businessId: business._id
+    });
+
+    if (!category) {
+        throw new AppError("Category not found", 404);
+    }
+
+    if (
+        categoryData.type !== undefined &&
+        categoryData.type !== category.type
+    ) {
+        const transactionExists = await Transaction.exists({
+            categoryId: category._id,
+            businessId: business._id
+        });
+
+        if (transactionExists) {
+            throw new AppError(
+                "Cannot change category type because transactions are associated with it",
+                409
+            );
+        }
+    }
+
     const updateData = {};
 
     validFields.forEach((field) => {
         updateData[field] = categoryData[field];
     });
 
-    const category = await Category.findOneAndUpdate(
+    const updatedCategory = await Category.findOneAndUpdate(
         {
             _id: categoryId,
             businessId: business._id
@@ -114,13 +140,9 @@ const updateCategory = async (userId, categoryId, categoryData) => {
         }
     );
 
-    if (!category) {
-        throw new AppError("Category not found", 404);
-    }
-
     return {
         message: "Category updated successfully",
-        category
+        category: updatedCategory
     };
 };
 
@@ -141,12 +163,18 @@ const deleteCategory = async (userId, categoryId) => {
         throw new AppError("Category not found", 404);
     }
 
-    // Delete all transactions related to this category
-    await Transaction.deleteMany({
-        categoryId: category._id
+    const transactionExists = await Transaction.exists({
+        categoryId: category._id,
+        businessId: business._id
     });
 
-    // Delete the category
+    if (transactionExists) {
+        throw new AppError(
+            "Cannot delete category because transactions are associated with it",
+            409
+        );
+    }
+
     await Category.deleteOne({
         _id: category._id
     });

@@ -32,7 +32,7 @@ const getBusiness = async (userId) => {
     return business;
 };
 
-const updateBusiness = async (userId, businessData) => {
+const updateBusiness = async (userId, businessData={}) => {
     const business = await Business.findOne({ userId });
 
     if (!business) {

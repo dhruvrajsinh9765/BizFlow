@@ -198,11 +198,13 @@ Keep the response concise, useful, and easy for a small business owner to unders
             contents: prompt
         });
     } catch (error) {
-        throw new AppError(
-            "Unable to generate business insights at the moment. Please try again later",
-            503
-        );
-    }
+    console.error("Gemini API error:", error);
+
+    throw new AppError(
+        "Unable to generate business insights at the moment. Please try again later",
+        503
+    );
+}
 
     if (!response.text) {
         throw new AppError(

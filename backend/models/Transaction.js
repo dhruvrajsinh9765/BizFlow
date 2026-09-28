@@ -23,7 +23,8 @@ const transactionSchema = new mongoose.Schema(
         amount: {
             type: Number,
             required: [true, "Transaction amount is required"],
-            min: [0.01, "Transaction amount must be greater than 0"]
+            min: [0.01, "Transaction amount must be greater than 0"],
+            max: [100000000, "Transaction amount is too large"]
         },
 
         paymentMethod: {
@@ -55,6 +56,11 @@ const transactionSchema = new mongoose.Schema(
         timestamps: true
     }
 );
+
+transactionSchema.index({ businessId: 1, transactionDate: -1 });
+transactionSchema.index({ businessId: 1, categoryId: 1 });
+transactionSchema.index({ businessId: 1, contactId: 1 });
+transactionSchema.index({ businessId: 1, paymentMethod: 1 });
 
 const Transaction = mongoose.model("Transaction", transactionSchema);
 

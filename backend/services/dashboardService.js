@@ -152,6 +152,8 @@ const getFinancialAnalytics = async (userId, filters = {}) => {
         if (Number.isNaN(parsedEndDate.getTime())) {
             throw new AppError("Invalid end date", 400);
         }
+
+        parsedEndDate.setHours(23, 59, 59, 999);
     }
 
     // Validate date range
@@ -242,10 +244,12 @@ const getFinancialAnalytics = async (userId, filters = {}) => {
             $group: {
                 _id: {
                     year: {
-                        $year: "$transactionDate"
+                        $year: "$transactionDate",
+                        timezone: "Asia/Kolkata"
                     },
                     month: {
-                        $month: "$transactionDate"
+                        $month: "$transactionDate",
+                        timezone: "Asia/Kolkata"
                     },
                     type: "$category.type"
                 },

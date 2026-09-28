@@ -3,6 +3,14 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const Session = require("../models/Session");
 const AppError = require("../utils/Apperror");
+const crypto = require("crypto");
+
+const hashRefreshToken = (token) => {
+    return crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+};
 
 const {
     generateAccessToken,
@@ -115,7 +123,7 @@ const loginUser = async (userData = {}) => {
     );
 
     // Store only the hashed refresh token in database
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    const refreshTokenHash = hashRefreshToken(refreshToken);
 
     // Create complete session
     await Session.create({
@@ -167,10 +175,8 @@ const refreshAccessToken = async (refreshToken) => {
         throw new AppError("Session expired", 401);
     }
 
-    const isRefreshTokenMatched = await bcrypt.compare(
-        refreshToken,
-        session.refreshTokenHash
-    );
+    const isRefreshTokenMatched =
+    hashRefreshToken(refreshToken) === session.refreshTokenHash;
 
     if (!isRefreshTokenMatched) {
         throw new AppError("Invalid refresh token", 401);
@@ -219,10 +225,8 @@ const logoutUser = async (refreshToken) => {
         throw new AppError("Session not found", 401);
     }
 
-    const isRefreshTokenMatched = await bcrypt.compare(
-        refreshToken,
-        session.refreshTokenHash
-    );
+    const isRefreshTokenMatched =
+    hashRefreshToken(refreshToken) === session.refreshTokenHash;
 
     if (!isRefreshTokenMatched) {
         throw new AppError("Invalid refresh token", 401);
@@ -352,35 +356,37 @@ const updateUserProfile = async (userId, userData = {}) => {
 
 
     if (name !== undefined) {
-        user.name = name;
+    user.name = name;
+}
+
+if (password !== undefined) {
+    if (password.length < 6) {
+        throw new AppError(
+            "Password must be at least 6 characters long",
+            400
+        );
     }
 
-    if (password !== undefined) {
-        if (password.length < 6) {
-            throw new AppError(
-                "Password must be at least 6 characters long",
-                400
-            );
-        }
+    user.password = await bcrypt.hash(password, 10);
+}
 
-        user.password = await bcrypt.hash(password, 10);
+const updatedUser = await user.save();
 
-        // Password change invalidates all existing sessions
-        await Session.deleteMany({
-            userId
-        });
+// Password change invalidates all existing sessions
+if (password !== undefined) {
+    await Session.deleteMany({
+        userId
+    });
+}
+
+return {
+    message: "Profile updated successfully",
+    user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email
     }
-
-    const updatedUser = await user.save();
-
-    return {
-        message: "Profile updated successfully",
-        user: {
-            id: updatedUser._id,
-            name: updatedUser.name,
-            email: updatedUser.email
-        }
-    };
+};
 };
 
 

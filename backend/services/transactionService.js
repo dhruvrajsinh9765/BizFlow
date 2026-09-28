@@ -107,9 +107,13 @@ const getTransactions = async (userId, filters) => {
         );
     }
 
-    if (!Number.isInteger(limitNumber) || limitNumber < 1) {
+    if (
+        !Number.isInteger(limitNumber) ||
+        limitNumber < 1 ||
+        limitNumber > 100
+    ) {
         throw new AppError(
-            "Limit must be a positive whole number",
+            "Limit must be a whole number between 1 and 100",
             400
         );
     }

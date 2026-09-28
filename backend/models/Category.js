@@ -11,7 +11,8 @@ const categorySchema = new mongoose.Schema(
         name: {
             type: String,
             required: [true, "Category name is required"],
-            trim: true
+            trim: true,
+            minlength: [1, "Category name cannot be empty"]
         },
 
         type: {
