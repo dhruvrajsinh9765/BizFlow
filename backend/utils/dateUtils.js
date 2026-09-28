@@ -34,8 +34,30 @@ const getEndOfDayIST = (dateString) => {
     return new Date(`${dateString}T23:59:59.999+05:30`);
 };
 
+const getMonthRangeIST = (year, month) => {
+    const start = new Date(
+        `${year}-${String(month).padStart(2, "0")}-01T00:00:00+05:30`
+    );
+
+    const nextMonth =
+        month === 12
+            ? `${year + 1}-01`
+            : `${year}-${String(month + 1).padStart(2, "0")}`;
+
+    const end = new Date(
+        `${nextMonth}-01T00:00:00+05:30`
+    );
+
+    end.setMilliseconds(end.getMilliseconds() - 1);
+
+    return {
+        start,
+        end
+    };
+};
 
 module.exports = {
     getStartOfDayIST,
-    getEndOfDayIST
+    getEndOfDayIST,
+    getMonthRangeIST
 };
