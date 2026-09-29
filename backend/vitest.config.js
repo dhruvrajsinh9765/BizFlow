@@ -4,5 +4,11 @@ module.exports = defineConfig({
     test: {
         environment: "node",
         setupFiles: ["./tests/setup.mjs"],
-    },
+
+        sequence: {
+            concurrent: false
+        },
+
+        fileParallelism: false
+    }
 });
