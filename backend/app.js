@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 
 const businessRoutes = require("./routes/businessRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -14,6 +15,12 @@ const errorHandler = require("./middleware/errorMiddleware");
 const app = express();
 
 // Middleware
+app.use(
+    cors({
+        origin: "http://localhost:5173"
+    })
+);
+
 app.use(express.json());
 app.use(express.text({ type: ["text/csv", "text/plain"] }));
 app.use(cookieParser());

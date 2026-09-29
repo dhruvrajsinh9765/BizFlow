@@ -12,6 +12,17 @@ const hashRefreshToken = (token) => {
         .digest("hex");
 };
 
+const isStrongPassword = (password) => {
+    return (
+        typeof password === "string" &&
+        password.length >= 8 &&
+        /[A-Z]/.test(password) &&
+        /[a-z]/.test(password) &&
+        /[0-9]/.test(password) &&
+        /[^A-Za-z0-9\s]/.test(password)
+    );
+};
+
 const {
     generateAccessToken,
     generateRefreshToken,
@@ -38,12 +49,12 @@ const registerUser = async (userData = {}) => {
     }
 
     // Validate password length before hashing
-    if (password.length < 6) {
-        throw new AppError(
-            "Password must be at least 6 characters long",
-            400
-        );
-    }
+    if (!isStrongPassword(password)) {
+    throw new AppError(
+        "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+        400
+    );
+}
 
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -360,12 +371,12 @@ const updateUserProfile = async (userId, userData = {}) => {
 }
 
 if (password !== undefined) {
-    if (password.length < 6) {
-        throw new AppError(
-            "Password must be at least 6 characters long",
-            400
-        );
-    }
+    if (!isStrongPassword(password)) {
+    throw new AppError(
+        "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+        400
+    );
+}
 
     user.password = await bcrypt.hash(password, 10);
 }
