@@ -1,8 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
 import ProtectedRoute from "./ProtectedRoute";
+import BusinessGuard from "./BusinessGuard";
+
+import DashboardLayout from "../components/layout/DashboardLayout";
 
 import Login from "../pages/Login";
 import Register from "../pages/Register";
+import BusinessSetup from "../pages/BusinessSetup";
 import Overview from "../pages/Overview";
 import Transactions from "../pages/Transactions";
 import Contacts from "../pages/Contacts";
@@ -16,23 +21,76 @@ const AppRoutes = () => {
         <BrowserRouter>
             <Routes>
                 {/* Public routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
+                <Route
+                    path="/login"
+                    element={<Login />}
+                />
 
-                {/* Protected routes */}
+                <Route
+                    path="/register"
+                    element={<Register />}
+                />
+
+                {/* Authenticated routes */}
                 <Route element={<ProtectedRoute />}>
-                    <Route path="/" element={<Navigate to="/overview" replace />} />
-                    <Route path="/overview" element={<Overview />} />
-                    <Route path="/transactions" element={<Transactions />} />
-                    <Route path="/contacts" element={<Contacts />} />
-                    <Route path="/categories" element={<Categories />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/ai-analyst" element={<AIAnalyst />} />
-                    <Route path="/settings" element={<Settings />} />
+                    {/* Default authenticated route */}
+                    <Route
+                        path="/"
+                        element={<Navigate to="/overview" replace />}
+                    />
+
+                    {/* Business setup */}
+                    <Route
+                        path="/business-setup"
+                        element={<BusinessSetup />}
+                    />
+
+                    {/* Routes that require a business */}
+                    <Route element={<BusinessGuard />}>
+                        <Route element={<DashboardLayout />}>
+                            <Route
+                                path="/overview"
+                                element={<Overview />}
+                            />
+
+                            <Route
+                                path="/transactions"
+                                element={<Transactions />}
+                            />
+
+                            <Route
+                                path="/contacts"
+                                element={<Contacts />}
+                            />
+
+                            <Route
+                                path="/categories"
+                                element={<Categories />}
+                            />
+
+                            <Route
+                                path="/analytics"
+                                element={<Analytics />}
+                            />
+
+                            <Route
+                                path="/ai-analyst"
+                                element={<AIAnalyst />}
+                            />
+
+                            <Route
+                                path="/settings"
+                                element={<Settings />}
+                            />
+                        </Route>
+                    </Route>
                 </Route>
 
                 {/* Unknown routes */}
-                <Route path="*" element={<Navigate to="/overview" replace />} />
+                <Route
+                    path="*"
+                    element={<Navigate to="/overview" replace />}
+                />
             </Routes>
         </BrowserRouter>
     );
