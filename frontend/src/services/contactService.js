@@ -8,6 +8,12 @@ const getContacts = async (params = {}) => {
     return response.data;
 };
 
+const getContactById = async (id) => {
+    const response = await api.get(`/contacts/${id}`);
+
+    return response.data;
+};
+
 const createContact = async (contactData) => {
     const response = await api.post(
         "/contacts",
@@ -36,6 +42,7 @@ const deleteContact = async (id) => {
 
 export default {
     getContacts,
+    getContactById,
     createContact,
     updateContact,
     deleteContact,
