@@ -34,7 +34,7 @@ const Select = ({
                         : "border-slate-700 focus:border-indigo-500"
                 } ${className}`}
             >
-                <option value="" disabled>
+                <option value="">
                     {placeholder}
                 </option>
 
