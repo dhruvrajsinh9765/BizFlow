@@ -49,10 +49,51 @@ const businessContactSchema = new mongoose.Schema(
             enum: ["customer", "supplier"],
             required: [true, "Contact type is required"]
         }
-
     },
     {
         timestamps: true
+    }
+);
+
+/*
+ * Email must be unique within the same business
+ * for active contacts.
+ *
+ * Different businesses can use the same email.
+ * Deleted contacts do not participate in the index.
+ */
+businessContactSchema.index(
+    {
+        businessId: 1,
+        email: 1
+    },
+    {
+        unique: true,
+        partialFilterExpression: {
+            isActive: true,
+            email: { $exists: true }
+        }
+    }
+);
+
+/*
+ * Phone must be unique within the same business
+ * for active contacts.
+ *
+ * Different businesses can use the same phone number.
+ * Deleted contacts do not participate in the index.
+ */
+businessContactSchema.index(
+    {
+        businessId: 1,
+        phone: 1
+    },
+    {
+        unique: true,
+        partialFilterExpression: {
+            isActive: true,
+            phone: { $exists: true }
+        }
     }
 );
 
@@ -62,3 +103,4 @@ const BusinessContact = mongoose.model(
 );
 
 module.exports = BusinessContact;
+
