@@ -64,15 +64,32 @@ describe("Business Contact API", () => {
     });
 
     test("CON-07 should list contacts with a type filter", async () => {
-        const { accessToken } = await setup();
-        await createContact(accessToken, { contactType: "customer" });
-        await createContact(accessToken, { contactType: "supplier" });
-        const response = await request(app).get("/api/contacts?contactType=customer")
-            .set(authHeader(accessToken));
-        expect(response.statusCode).toBe(200);
-        expect(response.body.length).toBeGreaterThan(0);
-        expect(response.body.every((c) => c.contactType === "customer")).toBe(true);
+    const { accessToken } = await setup();
+
+    await createContact(accessToken, {
+        contactType: "customer",
+        email: "customer@test.com",
+        phone: "9876543210"
     });
+
+    await createContact(accessToken, {
+        contactType: "supplier",
+        email: "supplier@test.com",
+        phone: "9876543211"
+    });
+
+    const response = await request(app)
+        .get("/api/contacts?contactType=customer")
+        .set(authHeader(accessToken));
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.length).toBeGreaterThan(0);
+    expect(
+        response.body.every(
+            (c) => c.contactType === "customer"
+        )
+    ).toBe(true);
+});
 
     test("CON-08 should get a contact by id", async () => {
         const { accessToken } = await setup();

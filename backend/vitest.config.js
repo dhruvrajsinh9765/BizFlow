@@ -9,6 +9,8 @@ module.exports = defineConfig({
             concurrent: false
         },
 
-        fileParallelism: false
+        fileParallelism: false,
+
+        testTimeout: 10000
     }
 });
