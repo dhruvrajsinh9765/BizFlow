@@ -3518,7 +3518,7 @@ title="Add Transaction"
 
 <form
 onSubmit={handleAddTransaction}
-className="space-y-4"
+className="max-h-[calc(100vh-220px)] space-y-4 overflow-y-auto pr-1 sm:max-h-[calc(100vh-240px)]"
 >
 
 {formSubmitError && (
@@ -3741,7 +3741,7 @@ formData.contactId
 </div>
 
 
-<div className="flex justify-end gap-3 border-t border-slate-800 pt-4">
+<div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-800 bg-slate-900/95 pt-4 backdrop-blur">
 
 <Button
 type="button"

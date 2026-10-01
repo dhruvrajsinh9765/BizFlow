@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import {
+    useEffect,
+    useState,
+} from "react";
+
 import {
     ArrowDownRight,
     ArrowUpRight,
-    Lightbulb,
-    Plus,
-    ShieldAlert,
+    ChevronRight,
     Sparkles,
-    Target,
-    Upload,
 } from "lucide-react";
 
 import {
@@ -23,11 +23,18 @@ import {
     Legend,
 } from "recharts";
 
+import { useNavigate } from "react-router-dom";
+
 import dashboardService from "../services/dashboardService";
 import insightService from "../services/insightService";
+import transactionService from "../services/transactionService";
+import contactService from "../services/contactService";
+import categoryService from "../services/categoryService";
+
 import { useAuth } from "../context/AuthContext";
 
 import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import EmptyState from "../components/ui/EmptyState";
 
@@ -47,12 +54,54 @@ const getDateString = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-const getDateRange = (period) => {
+const getDateRange = (period, selectedYear = "", selectedMonth = "") => {
+    const today = new Date();
+
+    if (selectedYear && selectedMonth !== "") {
+        const year = Number(selectedYear);
+        const month = Number(selectedMonth);
+        const startDate = new Date(year, month, 1);
+        const endDate = new Date(year, month + 1, 0);
+
+        return {
+            startDate: getDateString(startDate),
+            endDate: getDateString(endDate),
+        };
+    }
+
+    if (selectedYear) {
+        const year = Number(selectedYear);
+        const startDate = new Date(year, 0, 1);
+        const endDate = new Date(year, 11, 31);
+
+        if (year === today.getFullYear()) {
+            endDate.setTime(today.getTime());
+        }
+
+        return {
+            startDate: getDateString(startDate),
+            endDate: getDateString(endDate),
+        };
+    }
+
+    if (selectedMonth !== "") {
+        const year = today.getFullYear();
+        const month = Number(selectedMonth);
+        const startDate = new Date(year, month, 1);
+        const endDate = new Date(year, month + 1, 0);
+
+        return {
+            startDate: getDateString(startDate),
+            endDate: getDateString(endDate),
+        };
+    }
+
+    const activePeriod = period || "30D";
     const endDate = new Date();
     const startDate = new Date(endDate);
 
     startDate.setDate(
-        startDate.getDate() - PERIODS[period] + 1
+        startDate.getDate() - PERIODS[activePeriod] + 1
     );
 
     return {
@@ -61,14 +110,117 @@ const getDateRange = (period) => {
     };
 };
 
+const getChartGranularity = (period, selectedYear, selectedMonth) => {
+    if (selectedYear || selectedMonth) {
+        return "month";
+    }
+
+    return period === "7D" || period === "30D"
+        ? "day"
+        : "month";
+};
+
+const getChartKey = (date, granularity) => {
+    if (granularity === "day") {
+        return getDateString(date);
+    }
+
+    return `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+    ).padStart(2, "0")}`;
+};
+
+const getChartLabel = (date, granularity) => {
+    if (granularity === "day") {
+        return date.toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+        });
+    }
+
+    return date.toLocaleDateString("en-IN", {
+        month: "short",
+        year: "numeric",
+    });
+};
+
+const buildChartData = (transactions, categories, startDate, endDate, granularity) => {
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+
+    const buckets = new Map();
+    const cursor = new Date(start);
+
+    if (granularity === "month") {
+        cursor.setDate(1);
+    }
+
+    while (cursor <= end) {
+        const key = getChartKey(cursor, granularity);
+
+        buckets.set(key, {
+            period: key,
+            label: getChartLabel(cursor, granularity),
+            income: 0,
+            expense: 0,
+        });
+
+        if (granularity === "day") {
+            cursor.setDate(cursor.getDate() + 1);
+        } else {
+            cursor.setMonth(cursor.getMonth() + 1);
+        }
+    }
+
+    transactions.forEach((transaction) => {
+        if (!transaction?.transactionDate) {
+            return;
+        }
+
+        const date = new Date(transaction.transactionDate);
+
+        if (Number.isNaN(date.getTime())) {
+            return;
+        }
+
+        const category =
+            typeof transaction.categoryId === "object"
+                ? transaction.categoryId
+                : categories.find(
+                      (item) =>
+                          item._id === transaction.categoryId
+                  );
+
+        const key = getChartKey(date, granularity);
+        const bucket = buckets.get(key);
+
+        if (!bucket || !category?.type) {
+            return;
+        }
+
+        const amount = Number(transaction.amount) || 0;
+
+        if (category.type === "income") {
+            bucket.income += amount;
+        } else if (category.type === "expense") {
+            bucket.expense += amount;
+        }
+    });
+
+    return Array.from(buckets.values());
+};
+
 const Overview = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
 
     const [dashboard, setDashboard] = useState(null);
     const [recentTransactions, setRecentTransactions] =
         useState([]);
 
     const [period, setPeriod] = useState("30D");
+    const [selectedYear, setSelectedYear] = useState("");
+    const [selectedMonth, setSelectedMonth] = useState("");
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -77,52 +229,398 @@ const Overview = () => {
     const [aiLoading, setAiLoading] = useState(true);
     const [aiError, setAiError] = useState("");
 
+    const [contacts, setContacts] = useState([]);
+    const [categories, setCategories] = useState([]);
+
+    const [customerContribution, setCustomerContribution] =
+        useState([]);
+    const [customerContributionLoading, setCustomerContributionLoading] =
+        useState(true);
+    const [customerContributionError, setCustomerContributionError] =
+        useState("");
+
+    const [chartData, setChartData] = useState([]);
+    const [chartLoading, setChartLoading] = useState(true);
+
     /*
-     * Load dashboard analytics and recent transactions.
+     * ---------------------------------------------------------
+     * Dashboard
+     * ---------------------------------------------------------
      */
+
+    const fetchDashboard = async () => {
+        try {
+            setLoading(true);
+            setError("");
+
+            const { startDate, endDate } =
+                getDateRange(period, selectedYear, selectedMonth);
+
+            const [
+                analyticsData,
+                dashboardSummary,
+            ] = await Promise.all([
+                dashboardService.getFinancialAnalytics({
+                    startDate,
+                    endDate,
+                }),
+                dashboardService.getDashboardSummary(),
+            ]);
+
+            setDashboard(analyticsData);
+
+            setRecentTransactions(
+                dashboardSummary?.recentTransactions || []
+            );
+        } catch (error) {
+            setError(
+                error.response?.data?.message ||
+                    "Unable to load dashboard data."
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchDashboard = async () => {
+        fetchDashboard();
+    }, [period, selectedYear, selectedMonth]);
+
+    /*
+     * ---------------------------------------------------------
+     * Categories + Contacts
+     * ---------------------------------------------------------
+     */
+
+    useEffect(() => {
+        const fetchSupportData = async () => {
             try {
-                setLoading(true);
-                setError("");
-
-                const { startDate, endDate } =
-                    getDateRange(period);
-
                 const [
-                    analyticsData,
-                    dashboardSummary,
+                    categoriesData,
+                    contactsData,
                 ] = await Promise.all([
-                    dashboardService.getFinancialAnalytics({
-                        startDate,
-                        endDate,
-                    }),
-
-                    dashboardService.getDashboardSummary(),
+                    categoryService.getCategories(),
+                    contactService.getContacts(),
                 ]);
 
-                setDashboard(analyticsData);
+                setCategories(
+                    categoriesData?.categories ||
+                        categoriesData ||
+                        []
+                );
 
-                setRecentTransactions(
-                    dashboardSummary?.recentTransactions || []
+                setContacts(
+                    contactsData?.contacts ||
+                        contactsData ||
+                        []
                 );
             } catch (error) {
-                setError(
-                    error.response?.data?.message ||
-                        "Unable to load dashboard data."
+                console.error(
+                    "Failed to load categories or contacts:",
+                    error
                 );
-            } finally {
-                setLoading(false);
             }
         };
 
-        fetchDashboard();
-    }, [period]);
+        fetchSupportData();
+    }, []);
 
     /*
-     * Load AI insights once when Overview is opened.
+     * ---------------------------------------------------------
+     * Customer Contribution
+     * ---------------------------------------------------------
      */
+
     useEffect(() => {
+        let cancelled = false;
+
+        const fetchCustomerContribution = async () => {
+            try {
+                setCustomerContributionLoading(true);
+                setCustomerContributionError("");
+
+                const { startDate, endDate } =
+                    getDateRange(period, selectedYear, selectedMonth);
+
+                const transactionLimit = 100;
+                let page = 1;
+                let allTransactions = [];
+                let totalPages = 1;
+
+                do {
+                    const data =
+                        await transactionService.getTransactions({
+                            page,
+                            limit: transactionLimit,
+                            startDate,
+                            endDate,
+                        });
+
+                    const pageTransactions =
+                        data?.transactions || [];
+
+                    allTransactions = [
+                        ...allTransactions,
+                        ...pageTransactions,
+                    ];
+
+                    totalPages =
+                        Number(
+                            data?.pagination?.totalPages
+                        ) || 1;
+
+                    page += 1;
+                } while (page <= totalPages);
+
+                const getCategory = (transaction) => {
+                    if (!transaction?.categoryId) {
+                        return null;
+                    }
+
+                    if (
+                        typeof transaction.categoryId ===
+                        "object"
+                    ) {
+                        return transaction.categoryId;
+                    }
+
+                    return categories.find(
+                        (category) =>
+                            category._id ===
+                            transaction.categoryId
+                    );
+                };
+
+                const getContact = (transaction) => {
+                    if (!transaction?.contactId) {
+                        return null;
+                    }
+
+                    if (
+                        typeof transaction.contactId ===
+                        "object"
+                    ) {
+                        return transaction.contactId;
+                    }
+
+                    return contacts.find(
+                        (contact) =>
+                            contact._id ===
+                            transaction.contactId
+                    );
+                };
+
+                const contributionMap = new Map();
+
+                allTransactions.forEach(
+                    (transaction) => {
+                        const category =
+                            getCategory(transaction);
+
+                        const contact =
+                            getContact(transaction);
+
+                        if (
+                            category?.type !== "income" ||
+                            contact?.contactType !==
+                                "customer"
+                        ) {
+                            return;
+                        }
+
+                        const contactId =
+                            contact._id ||
+                            contact.id ||
+                            contact.name;
+
+                        if (!contactId) {
+                            return;
+                        }
+
+                        const current =
+                            contributionMap.get(
+                                contactId
+                            ) || {
+                                id: contactId,
+                                name:
+                                    contact.name ||
+                                    "Unknown customer",
+                                amount: 0,
+                                transactions: 0,
+                            };
+
+                        current.amount +=
+                            Number(
+                                transaction.amount
+                            ) || 0;
+
+                        current.transactions += 1;
+
+                        contributionMap.set(
+                            contactId,
+                            current
+                        );
+                    }
+                );
+
+                const contribution =
+                    Array.from(
+                        contributionMap.values()
+                    ).sort(
+                        (a, b) =>
+                            b.amount - a.amount
+                    );
+
+                const totalCustomerRevenue =
+                    contribution.reduce(
+                        (sum, customer) =>
+                            sum + customer.amount,
+                        0
+                    );
+
+                const result = contribution
+                    .slice(0, 5)
+                    .map((customer) => ({
+                        ...customer,
+                        percentage:
+                            totalCustomerRevenue > 0
+                                ? (customer.amount /
+                                      totalCustomerRevenue) *
+                                  100
+                                : 0,
+                    }));
+
+                if (!cancelled) {
+                    setCustomerContribution(result);
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load customer contribution:",
+                    error
+                );
+
+                if (!cancelled) {
+                    setCustomerContributionError(
+                        "Unable to load customer contribution."
+                    );
+                    setCustomerContribution([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setCustomerContributionLoading(
+                        false
+                    );
+                }
+            }
+        };
+
+        if (
+            categories.length > 0 ||
+            contacts.length > 0
+        ) {
+            fetchCustomerContribution();
+        } else {
+            setCustomerContributionLoading(true);
+        }
+
+        return () => {
+            cancelled = true;
+        };
+    }, [period, selectedYear, selectedMonth, categories, contacts]);
+
+    /*
+     * ---------------------------------------------------------
+     * Financial Chart
+     * ---------------------------------------------------------
+     */
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchChartData = async () => {
+            try {
+                setChartLoading(true);
+
+                const { startDate, endDate } =
+                    getDateRange(period, selectedYear, selectedMonth);
+
+                const transactionLimit = 100;
+                let page = 1;
+                let allTransactions = [];
+                let totalPages = 1;
+
+                do {
+                    const data =
+                        await transactionService.getTransactions({
+                            page,
+                            limit: transactionLimit,
+                            startDate,
+                            endDate,
+                        });
+
+                    allTransactions = [
+                        ...allTransactions,
+                        ...(data?.transactions || []),
+                    ];
+
+                    totalPages =
+                        Number(data?.pagination?.totalPages) || 1;
+                    page += 1;
+                } while (page <= totalPages);
+
+                const granularity = getChartGranularity(
+                    period,
+                    selectedYear,
+                    selectedMonth
+                );
+
+                const result = buildChartData(
+                    allTransactions,
+                    categories,
+                    startDate,
+                    endDate,
+                    granularity
+                );
+
+                if (!cancelled) {
+                    setChartData(result);
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load financial chart data:",
+                    error
+                );
+
+                if (!cancelled) {
+                    setChartData([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setChartLoading(false);
+                }
+            }
+        };
+
+        if (categories.length > 0) {
+            fetchChartData();
+        } else {
+            setChartLoading(true);
+        }
+
+        return () => {
+            cancelled = true;
+        };
+    }, [period, selectedYear, selectedMonth, categories]);
+
+    /*
+     * ---------------------------------------------------------
+     * AI Insights
+     * ---------------------------------------------------------
+     */
+
+    useEffect(() => {
+        let cancelled = false;
+
         const fetchAIInsights = async () => {
             try {
                 setAiLoading(true);
@@ -131,22 +629,40 @@ const Overview = () => {
                 const data =
                     await insightService.getInsights();
 
-                setAiInsights(data);
+                if (!cancelled) {
+                    setAiInsights(data);
+                }
             } catch (error) {
-                setAiError(
-                    error.response?.data?.message ||
-                        "Unable to generate business insights."
-                );
+                if (!cancelled) {
+                    setAiError(
+                        error.response?.data?.message ||
+                            "Unable to generate business insights."
+                    );
+                }
             } finally {
-                setAiLoading(false);
+                if (!cancelled) {
+                    setAiLoading(false);
+                }
             }
         };
 
         fetchAIInsights();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
+    /*
+     * ---------------------------------------------------------
+     * Helpers
+     * ---------------------------------------------------------
+     */
+
     const formatCurrency = (value) => {
-        return `₹${Number(value || 0).toLocaleString("en-IN")}`;
+        return `₹${Number(value || 0).toLocaleString(
+            "en-IN"
+        )}`;
     };
 
     const formatDate = (date) => {
@@ -164,29 +680,49 @@ const Overview = () => {
         );
     };
 
-    if (loading && !dashboard) {
-        return (
-            <div className="flex min-h-[60vh] items-center justify-center">
-                <LoadingSpinner size="lg" />
-            </div>
-        );
-    }
+    const getCategory = (transaction) => {
+        if (!transaction?.categoryId) {
+            return null;
+        }
 
-    if (error && !dashboard) {
-        return (
-            <Card>
-                <div className="py-10 text-center">
-                    <h2 className="text-lg font-semibold text-white">
-                        Unable to load dashboard
-                    </h2>
+        if (
+            typeof transaction.categoryId ===
+            "object"
+        ) {
+            return transaction.categoryId;
+        }
 
-                    <p className="mt-2 text-sm text-red-400">
-                        {error}
-                    </p>
-                </div>
-            </Card>
+        return categories.find(
+            (category) =>
+                category._id ===
+                transaction.categoryId
         );
-    }
+    };
+
+    const getContact = (transaction) => {
+        if (!transaction?.contactId) {
+            return null;
+        }
+
+        if (
+            typeof transaction.contactId ===
+            "object"
+        ) {
+            return transaction.contactId;
+        }
+
+        return contacts.find(
+            (contact) =>
+                contact._id ===
+                transaction.contactId
+        );
+    };
+
+    /*
+     * ---------------------------------------------------------
+     * Derived Dashboard Data
+     * ---------------------------------------------------------
+     */
 
     const summary = dashboard?.summary || {
         totalIncome: 0,
@@ -196,9 +732,6 @@ const Overview = () => {
 
     const categorySummary =
         dashboard?.categorySummary || [];
-
-    const monthlySummary =
-        dashboard?.monthlySummary || [];
 
     const totalIncome =
         Number(summary.totalIncome) || 0;
@@ -217,9 +750,12 @@ const Overview = () => {
     /*
      * Business Pulse
      */
-    const expenseCategories = categorySummary.filter(
-        (category) => category.type === "expense"
-    );
+
+    const expenseCategories =
+        categorySummary.filter(
+            (category) =>
+                category.type === "expense"
+        );
 
     const topExpenseCategory =
         expenseCategories.length > 0
@@ -245,58 +781,97 @@ const Overview = () => {
             : 0;
 
     /*
-     * Net Cash Movement
-     */
-    const netCashMovement = monthlySummary.map(
-        (month) => ({
-            ...month,
-            netCash:
-                Number(month.income || 0) -
-                Number(month.expense || 0),
-        })
-    );
-
-    /*
      * Expense Analysis
      */
+
     const expenseAnalysis = categorySummary
         .filter(
-            (category) => category.type === "expense"
+            (category) =>
+                category.type === "expense"
         )
         .map((category) => ({
             name: category.categoryName,
-            amount: Number(category.total) || 0,
+            amount:
+                Number(category.total) || 0,
         }))
-        .sort((a, b) => b.amount - a.amount);
+        .sort(
+            (a, b) => b.amount - a.amount
+        );
 
     /*
-     * AI Insights
+     * Category Summary
      */
-    const insights = aiInsights || {};
 
-    const keyFindings =
-        Array.isArray(insights.keyFindings)
-            ? insights.keyFindings
-            : [];
+    const categoryActivityTotal =
+        categorySummary.reduce(
+            (sum, category) =>
+                sum +
+                (Number(category.total) || 0),
+            0
+        );
 
-    const risks =
-        Array.isArray(insights.risks)
-            ? insights.risks
-            : [];
+    const visibleCategorySummary =
+        [...categorySummary]
+            .sort(
+                (a, b) =>
+                    Number(b.total) -
+                    Number(a.total)
+            )
+            .slice(0, 8);
 
-    const opportunities =
-        Array.isArray(insights.opportunities)
-            ? insights.opportunities
-            : [];
+    /*
+     * AI
+     */
 
-    const recommendedActions =
-        Array.isArray(insights.recommendedActions)
-            ? insights.recommendedActions
-            : [];
+    const insights = aiInsights?.insights || {};
+
+
+
+    /*
+     * ---------------------------------------------------------
+     * Loading / Initial Error
+     * ---------------------------------------------------------
+     */
+
+    if (loading && !dashboard) {
+        return (
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <LoadingSpinner size="lg" />
+            </div>
+        );
+    }
+
+    if (error && !dashboard) {
+        return (
+            <Card>
+                <div className="py-10 text-center">
+                    <h2 className="text-lg font-semibold text-white">
+                        Unable to load dashboard
+                    </h2>
+
+                    <p className="mt-2 text-sm text-red-400">
+                        {error}
+                    </p>
+
+                    <div className="mt-5">
+                        <Button
+                            type="button"
+                            onClick={fetchDashboard}
+                        >
+                            Try Again
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+        );
+    }
 
     return (
         <div className="space-y-6">
-            {/* Page Header */}
+            {/* =================================================
+                PAGE HEADER
+            ================================================= */}
+
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <p className="text-xs text-slate-500">
@@ -309,63 +884,87 @@ const Overview = () => {
                     </h1>
 
                     <p className="mt-1 text-sm text-slate-400">
-                        A clear view of what is happening in your business.
+                        A clear view of what is happening
+                        in your business.
                     </p>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                    <button
-                        type="button"
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
-                    >
-                        <Upload size={17} />
-                        Import CSV
-                    </button>
-
-                    <button
-                        type="button"
-                        className="inline-flex items-center gap-2 rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-400"
-                    >
-                        <Plus size={17} />
-                        Add Transaction
-                    </button>
-                </div>
             </div>
 
-            {/* Period Filters */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* =================================================
+                PERIOD FILTER
+            ================================================= */}
+
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex w-fit rounded-lg border border-slate-800 bg-slate-900 p-1">
-                    {Object.keys(PERIODS).map(
-                        (option) => (
-                            <button
-                                key={option}
-                                type="button"
-                                onClick={() =>
-                                    setPeriod(option)
-                                }
-                                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                                    period === option
-                                        ? "bg-indigo-500 text-white"
-                                        : "text-slate-400 hover:text-white"
-                                }`}
-                            >
-                                {option}
-                            </button>
-                        )
-                    )}
+                    {Object.keys(PERIODS).map((option) => (
+                        <button
+                            key={option}
+                            type="button"
+                            onClick={() => {
+                                setPeriod(option);
+                                setSelectedYear("");
+                                setSelectedMonth("");
+                            }}
+                            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                                period === option && !selectedYear && !selectedMonth
+                                    ? "bg-indigo-500 text-white"
+                                    : "text-slate-400 hover:text-white"
+                            }`}
+                        >
+                            {option}
+                        </button>
+                    ))}
                 </div>
 
-                <select
-                    defaultValue="2026-09"
-                    className="w-fit rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300 outline-none focus:border-indigo-500"
-                >
-                    <option value="2026-09">
-                        September 2026
-                    </option>
-                </select>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <select
+                        value={selectedYear}
+                        onChange={(event) => {
+                            setSelectedYear(event.target.value);
+                            setPeriod("");
+                        }}
+                        className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300 outline-none transition focus:border-indigo-500"
+                    >
+                        <option value="">All years</option>
+                        {Array.from({ length: 5 }, (_, index) => {
+                            const year = new Date().getFullYear() - index;
+                            return (
+                                <option key={year} value={year}>
+                                    {year}
+                                </option>
+                            );
+                        })}
+                    </select>
+
+                    <select
+                        value={selectedMonth}
+                        onChange={(event) => {
+                            setSelectedMonth(event.target.value);
+                            setPeriod("");
+                        }}
+                        className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300 outline-none transition focus:border-indigo-500"
+                    >
+                        <option value="">All months</option>
+                        {Array.from({ length: 12 }, (_, index) => (
+                            <option key={index} value={index}>
+                                {new Date(2000, index, 1).toLocaleString("en-IN", { month: "long" })}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
-            {/* Updating Indicator */}
+            <p className="text-xs text-slate-500">
+                {selectedYear && selectedMonth
+                    ? `Showing financial data for ${new Date(Number(selectedYear), Number(selectedMonth), 1).toLocaleString("en-IN", { month: "long", year: "numeric" })}`
+                    : selectedYear
+                    ? `Showing financial data for ${selectedYear}`
+                    : selectedMonth
+                    ? `Showing ${new Date(2000, Number(selectedMonth), 1).toLocaleString("en-IN", { month: "long" })} for the current year`
+                    : "Dashboard data for the selected period"}
+            </p>
+
             {loading && (
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                     <LoadingSpinner size="sm" />
@@ -373,16 +972,17 @@ const Overview = () => {
                 </div>
             )}
 
-            {/* Dashboard Error */}
             {error && (
                 <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">
                     {error}
                 </div>
             )}
 
-            {/* KPI Cards */}
+            {/* =================================================
+                KPI CARDS
+            ================================================= */}
+
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {/* Revenue */}
                 <Card>
                     <div className="flex items-start justify-between">
                         <div>
@@ -409,7 +1009,6 @@ const Overview = () => {
                     </div>
                 </Card>
 
-                {/* Expenses */}
                 <Card>
                     <div className="flex items-start justify-between">
                         <div>
@@ -436,7 +1035,6 @@ const Overview = () => {
                     </div>
                 </Card>
 
-                {/* Net Profit */}
                 <Card>
                     <div className="flex items-start justify-between">
                         <div>
@@ -463,7 +1061,6 @@ const Overview = () => {
                     </div>
                 </Card>
 
-                {/* Profit Margin */}
                 <Card>
                     <div className="flex items-start justify-between">
                         <div>
@@ -492,21 +1089,29 @@ const Overview = () => {
                 </Card>
             </div>
 
-            {/* Financial Performance */}
+            {/* =================================================
+                FINANCIAL PERFORMANCE
+            ================================================= */}
+
             <Card
                 title="Financial Performance"
                 description="Income vs expenses over the selected period."
             >
-                {monthlySummary.length > 0 ? (
+                {chartLoading ? (
+                    <div className="flex h-80 items-center justify-center">
+                        <div className="flex items-center gap-3 text-sm text-slate-400">
+                            <LoadingSpinner size="sm" />
+                            Updating financial performance...
+                        </div>
+                    </div>
+                ) : chartData.length > 0 ? (
                     <div className="h-80 w-full">
                         <ResponsiveContainer
                             width="100%"
                             height="100%"
                         >
                             <LineChart
-                                data={
-                                    monthlySummary
-                                }
+                                data={chartData}
                                 margin={{
                                     top: 10,
                                     right: 10,
@@ -520,7 +1125,7 @@ const Overview = () => {
                                 />
 
                                 <XAxis
-                                    dataKey="period"
+                                    dataKey="label"
                                     stroke="#64748b"
                                     tick={{
                                         fontSize: 12,
@@ -570,7 +1175,9 @@ const Overview = () => {
                                     dataKey="income"
                                     name="Income"
                                     stroke="#34d399"
-                                    strokeWidth={2}
+                                    strokeWidth={
+                                        2
+                                    }
                                     dot={{
                                         r: 3,
                                     }}
@@ -584,7 +1191,9 @@ const Overview = () => {
                                     dataKey="expense"
                                     name="Expenses"
                                     stroke="#f87171"
-                                    strokeWidth={2}
+                                    strokeWidth={
+                                        2
+                                    }
                                     dot={{
                                         r: 3,
                                     }}
@@ -603,13 +1212,15 @@ const Overview = () => {
                 )}
             </Card>
 
-            {/* Business Pulse */}
+            {/* =================================================
+                BUSINESS PULSE
+            ================================================= */}
+
             <Card
                 title="Business Pulse"
                 description="A quick snapshot of your current financial position."
             >
                 <div className="grid gap-4 md:grid-cols-3">
-                    {/* Financial Position */}
                     <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
                         <p className="text-sm text-slate-400">
                             Financial Position
@@ -629,16 +1240,18 @@ const Overview = () => {
                             />
 
                             <p className="text-lg font-semibold text-white">
-                                {financialPosition}
+                                {
+                                    financialPosition
+                                }
                             </p>
                         </div>
 
                         <p className="mt-2 text-xs text-slate-500">
-                            Based on income and expenses for the selected period.
+                            Based on income and expenses for
+                            the selected period.
                         </p>
                     </div>
 
-                    {/* Top Expense Category */}
                     <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
                         <p className="text-sm text-slate-400">
                             Top Expense Category
@@ -665,11 +1278,11 @@ const Overview = () => {
                         )}
 
                         <p className="mt-2 text-xs text-slate-500">
-                            Highest expense category in the selected period.
+                            Highest expense category in the
+                            selected period.
                         </p>
                     </div>
 
-                    {/* Expense Coverage */}
                     <div className="rounded-lg border border-slate-800 bg-slate-950 p-4">
                         <p className="text-sm text-slate-400">
                             Expense Coverage
@@ -684,81 +1297,17 @@ const Overview = () => {
                         </p>
 
                         <p className="mt-2 text-xs text-slate-500">
-                            Revenue generated for every ₹1 spent.
+                            Revenue generated for every ₹1
+                            spent.
                         </p>
                     </div>
                 </div>
             </Card>
 
-            {/* Net Cash Movement */}
-            <Card
-                title="Net Cash Movement"
-                description="Monthly movement after subtracting expenses from income."
-            >
-                {netCashMovement.length > 0 ? (
-                    <div className="space-y-3">
-                        {netCashMovement.map(
-                            (month) => (
-                                <div
-                                    key={
-                                        month.period
-                                    }
-                                    className="flex items-center justify-between rounded-lg bg-slate-950 px-4 py-3"
-                                >
-                                    <div>
-                                        <p className="text-sm font-medium text-white">
-                                            {
-                                                month.period
-                                            }
-                                        </p>
+            {/* =================================================
+                EXPENSE ANALYSIS
+            ================================================= */}
 
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Income{" "}
-                                            {formatCurrency(
-                                                month.income
-                                            )}
-                                            {" · "}
-                                            Expenses{" "}
-                                            {formatCurrency(
-                                                month.expense
-                                            )}
-                                        </p>
-                                    </div>
-
-                                    <div className="text-right">
-                                        <p
-                                            className={`text-sm font-semibold ${
-                                                month.netCash >
-                                                0
-                                                    ? "text-emerald-400"
-                                                    : month.netCash <
-                                                      0
-                                                    ? "text-red-400"
-                                                    : "text-slate-400"
-                                            }`}
-                                        >
-                                            {formatCurrency(
-                                                month.netCash
-                                            )}
-                                        </p>
-
-                                        <p className="mt-1 text-xs text-slate-500">
-                                            Net movement
-                                        </p>
-                                    </div>
-                                </div>
-                            )
-                        )}
-                    </div>
-                ) : (
-                    <EmptyState
-                        title="No cash movement yet"
-                        description="Net cash movement will appear here once you have financial transactions."
-                    />
-                )}
-            </Card>
-
-            {/* Expense Analysis */}
             <Card
                 title="Expense Analysis"
                 description="How your expenses are distributed across categories."
@@ -855,390 +1404,322 @@ const Overview = () => {
                 )}
             </Card>
 
-            {/* Customer Contribution */}
+            {/* =================================================
+                CUSTOMER CONTRIBUTION
+            ================================================= */}
+
             <Card
                 title="Customer Contribution"
-                description="Revenue contribution from your customers."
+                description="Revenue contribution from your customers during the selected period."
             >
-                <EmptyState
-                    title="No customer contribution data yet"
-                    description="Customer revenue contribution will appear here once transactions are linked to customers."
-                />
-            </Card>
-
-            {/* AI Analyst */}
-            <Card
-                title="AI Analyst"
-                description="AI-powered insights based on your business financial data."
-            >
-                {aiLoading ? (
+                {customerContributionLoading ? (
                     <div className="flex min-h-40 items-center justify-center">
                         <div className="flex items-center gap-3 text-sm text-slate-400">
                             <LoadingSpinner size="sm" />
-                            Analyzing your business data...
+                            Calculating customer contribution...
                         </div>
                     </div>
-                ) : aiError ? (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-5">
-                        <div className="flex items-start gap-3">
-                            <ShieldAlert
-                                size={20}
-                                className="mt-0.5 text-red-400"
-                            />
-
-                            <div>
-                                <p className="text-sm font-medium text-red-300">
-                                    Unable to generate AI insights
-                                </p>
-
-                                <p className="mt-1 text-sm text-red-400/80">
-                                    {aiError}
-                                </p>
-                            </div>
-                        </div>
+                ) : customerContributionError ? (
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-5 text-sm text-red-400">
+                        {customerContributionError}
                     </div>
-                ) : !insights.summary &&
-                  keyFindings.length === 0 &&
-                  risks.length === 0 &&
-                  opportunities.length === 0 &&
-                  recommendedActions.length === 0 ? (
-                    <EmptyState
-                        title="No AI insights yet"
-                        description="AI insights will appear here once enough financial data is available."
-                    />
-                ) : (
-                    <div className="space-y-6">
-                        {/* Summary */}
-                        {insights.summary && (
-                            <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-5">
-                                <div className="flex items-start gap-3">
-                                    <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400">
-                                        <Sparkles
-                                            size={18}
+                ) : customerContribution.length >
+                  0 ? (
+                    <div className="space-y-4">
+                        {customerContribution.map(
+                            (customer) => (
+                                <div
+                                    key={
+                                        customer.id
+                                    }
+                                    className="rounded-xl border border-slate-800 bg-slate-950 p-4"
+                                >
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-white">
+                                                {
+                                                    customer.name
+                                                }
+                                            </p>
+
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {
+                                                    customer.transactions
+                                                }{" "}
+                                                {customer.transactions ===
+                                                1
+                                                    ? "transaction"
+                                                    : "transactions"}
+                                            </p>
+                                        </div>
+
+                                        <div className="text-left sm:text-right">
+                                            <p className="text-sm font-semibold text-emerald-400">
+                                                {formatCurrency(
+                                                    customer.amount
+                                                )}
+                                            </p>
+
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {customer.percentage.toFixed(
+                                                    1
+                                                )}
+                                                %
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
+                                        <div
+                                            className="h-full rounded-full bg-indigo-500 transition-all"
+                                            style={{
+                                                width: `${Math.min(
+                                                    customer.percentage,
+                                                    100
+                                                )}%`,
+                                            }}
                                         />
                                     </div>
-
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-white">
-                                            Financial Summary
-                                        </h3>
-
-                                        <p className="mt-2 text-sm leading-6 text-slate-300">
-                                            {
-                                                insights.summary
-                                            }
-                                        </p>
-                                    </div>
                                 </div>
-                            </div>
+                            )
                         )}
 
-                        {/* Key Findings */}
-                        {keyFindings.length > 0 && (
-                            <div>
-                                <div className="mb-3 flex items-center gap-2">
-                                    <Target
-                                        size={18}
-                                        className="text-blue-400"
-                                    />
-
-                                    <h3 className="font-['Space_Grotesk'] text-base font-semibold text-white">
-                                        Key Findings
-                                    </h3>
-                                </div>
-
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    {keyFindings.map(
-                                        (
-                                            finding,
-                                            index
-                                        ) => (
-                                            <div
-                                                key={`${finding.title}-${index}`}
-                                                className="rounded-lg border border-slate-800 bg-slate-950 p-4"
-                                            >
-                                                <h4 className="text-sm font-semibold text-white">
-                                                    {
-                                                        finding.title
-                                                    }
-                                                </h4>
-
-                                                <p className="mt-2 text-sm leading-5 text-slate-400">
-                                                    {
-                                                        finding.description
-                                                    }
-                                                </p>
-
-                                                {finding.evidence && (
-                                                    <p className="mt-3 text-xs text-slate-500">
-                                                        Evidence:{" "}
-                                                        {
-                                                            finding.evidence
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Risks */}
-                        {risks.length > 0 && (
-                            <div>
-                                <div className="mb-3 flex items-center gap-2">
-                                    <ShieldAlert
-                                        size={18}
-                                        className="text-red-400"
-                                    />
-
-                                    <h3 className="font-['Space_Grotesk'] text-base font-semibold text-white">
-                                        Risks
-                                    </h3>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {risks.map(
-                                        (
-                                            risk,
-                                            index
-                                        ) => (
-                                            <div
-                                                key={`${risk.title}-${index}`}
-                                                className="rounded-lg border border-red-500/10 bg-red-500/5 p-4"
-                                            >
-                                                <h4 className="text-sm font-semibold text-white">
-                                                    {
-                                                        risk.title
-                                                    }
-                                                </h4>
-
-                                                <p className="mt-2 text-sm leading-5 text-slate-400">
-                                                    {
-                                                        risk.description
-                                                    }
-                                                </p>
-
-                                                {risk.evidence && (
-                                                    <p className="mt-3 text-xs text-slate-500">
-                                                        Evidence:{" "}
-                                                        {
-                                                            risk.evidence
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Opportunities */}
-                        {opportunities.length > 0 && (
-                            <div>
-                                <div className="mb-3 flex items-center gap-2">
-                                    <Lightbulb
-                                        size={18}
-                                        className="text-amber-400"
-                                    />
-
-                                    <h3 className="font-['Space_Grotesk'] text-base font-semibold text-white">
-                                        Opportunities
-                                    </h3>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {opportunities.map(
-                                        (
-                                            opportunity,
-                                            index
-                                        ) => (
-                                            <div
-                                                key={`${opportunity.title}-${index}`}
-                                                className="rounded-lg border border-amber-500/10 bg-amber-500/5 p-4"
-                                            >
-                                                <h4 className="text-sm font-semibold text-white">
-                                                    {
-                                                        opportunity.title
-                                                    }
-                                                </h4>
-
-                                                <p className="mt-2 text-sm leading-5 text-slate-400">
-                                                    {
-                                                        opportunity.description
-                                                    }
-                                                </p>
-
-                                                {opportunity.evidence && (
-                                                    <p className="mt-3 text-xs text-slate-500">
-                                                        Evidence:{" "}
-                                                        {
-                                                            opportunity.evidence
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Recommended Actions */}
-                        {recommendedActions.length > 0 && (
-                            <div>
-                                <div className="mb-3 flex items-center gap-2">
-                                    <ArrowUpRight
-                                        size={18}
-                                        className="text-emerald-400"
-                                    />
-
-                                    <h3 className="font-['Space_Grotesk'] text-base font-semibold text-white">
-                                        Recommended Actions
-                                    </h3>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {recommendedActions.map(
-                                        (
-                                            recommendation,
-                                            index
-                                        ) => (
-                                            <div
-                                                key={`${recommendation.action}-${index}`}
-                                                className="rounded-lg border border-slate-800 bg-slate-950 p-4"
-                                            >
-                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                                    <h4 className="text-sm font-semibold text-white">
-                                                        {
-                                                            recommendation.action
-                                                        }
-                                                    </h4>
-
-                                                    {recommendation.priority && (
-                                                        <span
-                                                            className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
-                                                                recommendation.priority ===
-                                                                "high"
-                                                                    ? "bg-red-500/10 text-red-400"
-                                                                    : recommendation.priority ===
-                                                                      "medium"
-                                                                    ? "bg-amber-500/10 text-amber-400"
-                                                                    : "bg-slate-800 text-slate-400"
-                                                            }`}
-                                                        >
-                                                            {
-                                                                recommendation.priority
-                                                            }{" "}
-                                                            priority
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {recommendation.reason && (
-                                                    <p className="mt-2 text-sm leading-5 text-slate-400">
-                                                        {
-                                                            recommendation.reason
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-                            </div>
+                        {customerContribution.length ===
+                            5 && (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    navigate(
+                                        "/contacts"
+                                    )
+                                }
+                                className="inline-flex items-center gap-1 text-sm font-medium text-indigo-400 transition hover:text-indigo-300"
+                            >
+                                View all customers
+                                <ChevronRight
+                                    size={16}
+                                />
+                            </button>
                         )}
                     </div>
+                ) : (
+                    <EmptyState
+                        title="No customer contribution data yet"
+                        description="Customer revenue contribution will appear here once income transactions are linked to customers."
+                    />
                 )}
             </Card>
 
-            {/* Recent Transactions */}
+            {/* =================================================
+                AI BUSINESS INSIGHTS
+            ================================================= */}
+
+            <Card>
+                <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex items-start gap-3">
+                            <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400">
+                                <Sparkles size={18} />
+                            </div>
+
+                            <div>
+                                <p className="text-xs font-medium uppercase tracking-wide text-indigo-400">
+                                    AI Business Insights
+                                </p>
+                                <h2 className="mt-1 text-lg font-semibold text-white">
+                                    What stands out in your business
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    Highlights from your latest business data. Open AI Analyst for the detailed analysis and recommendations.
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => navigate("/ai-analyst")}
+                            className="inline-flex w-fit shrink-0 items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm font-medium text-slate-200 transition hover:border-indigo-500/50 hover:bg-slate-800 hover:text-white"
+                        >
+                            Open AI Analyst
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+
+                    {aiLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-slate-400">
+                            <LoadingSpinner size="sm" />
+                            Analyzing your business data...
+                        </div>
+                    ) : aiError ? (
+                        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">
+                            AI insights are temporarily unavailable.
+                        </div>
+                    ) : Array.isArray(insights.keyFindings) && insights.keyFindings.length > 0 ? (
+                        <div className="grid gap-4 md:grid-cols-2">
+                            {insights.keyFindings.slice(0, 2).map((item, index) => (
+                                <div
+                                    key={`overview-finding-${index}`}
+                                    className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"
+                                >
+                                    <p className="text-sm font-semibold text-white">
+                                        {item?.title || "Business finding"}
+                                    </p>
+
+                                    {item?.description && (
+                                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                                            {item.description}
+                                        </p>
+                                    )}
+
+                                    {item?.evidence && (
+                                        <p className="mt-3 border-t border-slate-800 pt-3 text-xs leading-5 text-slate-500">
+                                            <span className="font-medium text-slate-400">Evidence:</span>{" "}
+                                            {item.evidence}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : insights.summary ? (
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                            <p className="text-sm leading-6 text-slate-300">
+                                {insights.summary}
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-slate-400">
+                            Open AI Analyst for a detailed view of your business performance.
+                        </p>
+                    )}
+                </div>
+            </Card>
+
+            {/* =================================================
+                RECENT TRANSACTIONS
+            ================================================= */}
+
             <Card
                 title="Recent Transactions"
                 description="Your latest financial activity."
             >
-                {recentTransactions.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[700px]">
-                            <thead>
-                                <tr className="border-b border-slate-800 text-left">
-                                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-                                        Date
-                                    </th>
+                {recentTransactions.length >
+                0 ? (
+                    <div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[850px]">
+                                <thead>
+                                    <tr className="border-b border-slate-800 text-left">
+                                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+                                            Date
+                                        </th>
 
-                                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-                                        Description
-                                    </th>
+                                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+                                            Description
+                                        </th>
 
-                                    <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-                                        Category
-                                    </th>
+                                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+                                            Category
+                                        </th>
 
-                                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
-                                        Amount
-                                    </th>
-                                </tr>
-                            </thead>
+                                        <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+                                            Contact
+                                        </th>
 
-                            <tbody>
-                                {recentTransactions.map(
-                                    (transaction) => {
-                                        const isIncome =
-                                            transaction.categoryId
-                                                ?.type ===
-                                            "income";
+                                        <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-slate-500">
+                                            Amount
+                                        </th>
+                                    </tr>
+                                </thead>
 
-                                        return (
-                                            <tr
-                                                key={
-                                                    transaction._id
-                                                }
-                                                className="border-b border-slate-800/70 last:border-0"
-                                            >
-                                                <td className="px-4 py-4 text-sm text-slate-400">
-                                                    {formatDate(
-                                                        transaction.transactionDate
-                                                    )}
-                                                </td>
+                                <tbody>
+                                    {recentTransactions.map(
+                                        (
+                                            transaction
+                                        ) => {
+                                            const category =
+                                                getCategory(
+                                                    transaction
+                                                );
 
-                                                <td className="px-4 py-4">
-                                                    <p className="text-sm font-medium text-white">
-                                                        {transaction.description ||
-                                                            "No description"}
-                                                    </p>
-                                                </td>
+                                            const contact =
+                                                getContact(
+                                                    transaction
+                                                );
 
-                                                <td className="px-4 py-4">
-                                                    <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-300">
-                                                        {transaction
-                                                            .categoryId
-                                                            ?.name ||
-                                                            "Uncategorized"}
-                                                    </span>
-                                                </td>
+                                            const isIncome =
+                                                category?.type ===
+                                                "income";
 
-                                                <td
-                                                    className={`px-4 py-4 text-right text-sm font-semibold ${
-                                                        isIncome
-                                                            ? "text-emerald-400"
-                                                            : "text-red-400"
-                                                    }`}
+                                            return (
+                                                <tr
+                                                    key={
+                                                        transaction._id
+                                                    }
+                                                    className="border-b border-slate-800/70 last:border-0"
                                                 >
-                                                    {isIncome
-                                                        ? "+"
-                                                        : "-"}
-                                                    {formatCurrency(
-                                                        transaction.amount
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    }
-                                )}
-                            </tbody>
-                        </table>
+                                                    <td className="px-4 py-4 text-sm text-slate-400">
+                                                        {formatDate(
+                                                            transaction.transactionDate
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-4 py-4">
+                                                        <p className="text-sm font-medium text-white">
+                                                            {transaction.description ||
+                                                                "No description"}
+                                                        </p>
+                                                    </td>
+
+                                                    <td className="px-4 py-4">
+                                                        <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-300">
+                                                            {category?.name ||
+                                                                "Uncategorized"}
+                                                        </span>
+                                                    </td>
+
+                                                    <td className="px-4 py-4 text-sm text-slate-400">
+                                                        {contact?.name ||
+                                                            "—"}
+                                                    </td>
+
+                                                    <td
+                                                        className={`px-4 py-4 text-right text-sm font-semibold ${
+                                                            isIncome
+                                                                ? "text-emerald-400"
+                                                                : "text-red-400"
+                                                        }`}
+                                                    >
+                                                        {isIncome
+                                                            ? "+"
+                                                            : "-"}
+                                                        {formatCurrency(
+                                                            transaction.amount
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="mt-4 flex justify-end border-t border-slate-800 pt-4">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    navigate(
+                                        "/transactions"
+                                    )
+                                }
+                                className="inline-flex items-center gap-1 text-sm font-medium text-indigo-400 transition hover:text-indigo-300"
+                            >
+                                View all transactions
+                                <ChevronRight
+                                    size={16}
+                                />
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <EmptyState
@@ -1248,42 +1729,114 @@ const Overview = () => {
                 )}
             </Card>
 
-            {/* Category Summary */}
+            {/* =================================================
+                CATEGORY SUMMARY
+            ================================================= */}
+
             <Card
                 title="Category Summary"
-                description="Your financial activity grouped by category."
+                description="Your financial activity grouped by category. Percentages show each category’s share of total financial activity."
             >
-                {categorySummary.length > 0 ? (
-                    <div className="space-y-3">
-                        {categorySummary.map(
-                            (category) => (
-                                <div
-                                    key={
-                                        category.categoryId
-                                    }
-                                    className="flex items-center justify-between rounded-lg bg-slate-950 px-4 py-3"
-                                >
-                                    <div>
-                                        <p className="text-sm font-medium text-white">
-                                            {
-                                                category.categoryName
-                                            }
-                                        </p>
+                {visibleCategorySummary.length >
+                0 ? (
+                    <div className="space-y-4">
+                        {visibleCategorySummary.map(
+                            (category) => {
+                                const total =
+                                    Number(
+                                        category.total
+                                    ) || 0;
 
-                                        <p className="mt-1 text-xs capitalize text-slate-500">
-                                            {
-                                                category.type
-                                            }
-                                        </p>
+                                const percentage =
+                                    categoryActivityTotal >
+                                    0
+                                        ? (total /
+                                              categoryActivityTotal) *
+                                          100
+                                        : 0;
+
+                                return (
+                                    <div
+                                        key={
+                                            category.categoryId
+                                        }
+                                        className="rounded-lg border border-slate-800 bg-slate-950 p-4"
+                                    >
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-medium text-white">
+                                                    {
+                                                        category.categoryName
+                                                    }
+                                                </p>
+
+                                                <p
+                                                    className={`mt-1 text-xs capitalize ${
+                                                        category.type ===
+                                                        "income"
+                                                            ? "text-emerald-400"
+                                                            : "text-red-400"
+                                                    }`}
+                                                >
+                                                    {
+                                                        category.type
+                                                    }
+                                                </p>
+                                            </div>
+
+                                            <div className="text-right">
+                                                <p className="text-sm font-semibold text-slate-200">
+                                                    {formatCurrency(
+                                                        total
+                                                    )}
+                                                </p>
+
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    {percentage.toFixed(
+                                                        1
+                                                    )}
+                                                    %
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                                            <div
+                                                className={`h-full rounded-full ${
+                                                    category.type ===
+                                                    "income"
+                                                        ? "bg-emerald-500"
+                                                        : "bg-indigo-500"
+                                                }`}
+                                                style={{
+                                                    width: `${Math.min(
+                                                        percentage,
+                                                        100
+                                                    )}%`,
+                                                }}
+                                            />
+                                        </div>
                                     </div>
+                                );
+                            }
+                        )}
 
-                                    <p className="text-sm font-semibold text-slate-200">
-                                        {formatCurrency(
-                                            category.total
-                                        )}
-                                    </p>
-                                </div>
-                            )
+                        {categorySummary.length >
+                            visibleCategorySummary.length && (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    navigate(
+                                        "/categories"
+                                    )
+                                }
+                                className="inline-flex items-center gap-1 text-sm font-medium text-indigo-400 transition hover:text-indigo-300"
+                            >
+                                View all categories
+                                <ChevronRight
+                                    size={16}
+                                />
+                            </button>
                         )}
                     </div>
                 ) : (
@@ -1293,6 +1846,7 @@ const Overview = () => {
                     />
                 )}
             </Card>
+
         </div>
     );
 };
