@@ -2,12 +2,15 @@ import { createContext, useContext, useEffect, useState } from "react";
 import authService from "../services/authService";
 import { setAccessToken } from "../services/api";
 
+
 const AuthContext = createContext(null);
+
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [accessToken, setAccessTokenState] = useState(null);
     const [loading, setLoading] = useState(true);
+
 
     const login = async (credentials) => {
         const data = await authService.login(credentials);
@@ -19,9 +22,11 @@ export const AuthProvider = ({ children }) => {
         return data;
     };
 
+
     const register = async (userData) => {
         return await authService.register(userData);
     };
+
 
     const logout = async () => {
         try {
@@ -32,6 +37,14 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
         }
     };
+
+
+    const clearSession = () => {
+        setAccessToken(null);
+        setAccessTokenState(null);
+        setUser(null);
+    };
+
 
     const refreshSession = async () => {
         try {
@@ -45,14 +58,13 @@ export const AuthProvider = ({ children }) => {
             setUser(profile);
 
             return true;
-        } catch (error) {
-            setAccessToken(null);
-            setAccessTokenState(null);
-            setUser(null);
+        } catch {
+            clearSession();
 
             return false;
         }
     };
+
 
     useEffect(() => {
         const initializeAuth = async () => {
@@ -61,7 +73,12 @@ export const AuthProvider = ({ children }) => {
         };
 
         initializeAuth();
+
+        // refreshSession is intentionally called only during
+        // authentication initialization.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
 
     const value = {
         user,
@@ -71,7 +88,9 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
+        clearSession,
     };
+
 
     return (
         <AuthContext.Provider value={value}>
@@ -80,6 +99,8 @@ export const AuthProvider = ({ children }) => {
     );
 };
 
+
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
     const context = useContext(AuthContext);
 
@@ -91,3 +112,4 @@ export const useAuth = () => {
 
     return context;
 };
+
