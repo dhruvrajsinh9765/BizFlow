@@ -9,8 +9,8 @@ const DashboardLayout = () => {
 
             <Topbar />
 
-            <main className="ml-64 pt-16">
-                <div className="p-6">
+            <main className="pt-16 lg:ml-64">
+                <div className="px-4 py-5 sm:px-6 sm:py-6">
                     <Outlet />
                 </div>
             </main>

@@ -5,20 +5,22 @@ const Badge = ({
 }) => {
     const variants = {
         default:
-            "bg-slate-800 text-slate-300",
+            "border border-slate-700/80 bg-slate-800/80 text-slate-300",
         success:
-            "bg-emerald-500/10 text-emerald-400",
+            "border border-emerald-400/15 bg-emerald-500/10 text-emerald-400",
         danger:
-            "bg-red-500/10 text-red-400",
+            "border border-red-400/15 bg-red-500/10 text-red-400",
         warning:
-            "bg-amber-500/10 text-amber-400",
+            "border border-amber-400/15 bg-amber-500/10 text-amber-400",
         info:
-            "bg-blue-500/10 text-blue-400",
+            "border border-blue-400/15 bg-blue-500/10 text-blue-400",
     };
 
     return (
         <span
-            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${variants[variant]} ${className}`}
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium leading-4 transition-colors duration-150 ${
+                variants[variant] || variants.default
+            } ${className}`}
         >
             {children}
         </span>
@@ -26,4 +28,3 @@ const Badge = ({
 };
 
 export default Badge;
-

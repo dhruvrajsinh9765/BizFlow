@@ -5,6 +5,7 @@ import BusinessGuard from "./BusinessGuard";
 
 import DashboardLayout from "../components/layout/DashboardLayout";
 
+import Home from "../pages/Home";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import BusinessSetup from "../pages/BusinessSetup";
@@ -22,6 +23,11 @@ const AppRoutes = () => {
             <Routes>
                 {/* Public routes */}
                 <Route
+                    path="/"
+                    element={<Home />}
+                />
+
+                <Route
                     path="/login"
                     element={<Login />}
                 />
@@ -33,12 +39,6 @@ const AppRoutes = () => {
 
                 {/* Authenticated routes */}
                 <Route element={<ProtectedRoute />}>
-                    {/* Default authenticated route */}
-                    <Route
-                        path="/"
-                        element={<Navigate to="/overview" replace />}
-                    />
-
                     {/* Business setup */}
                     <Route
                         path="/business-setup"
@@ -89,7 +89,7 @@ const AppRoutes = () => {
                 {/* Unknown routes */}
                 <Route
                     path="*"
-                    element={<Navigate to="/overview" replace />}
+                    element={<Navigate to="/" replace />}
                 />
             </Routes>
         </BrowserRouter>

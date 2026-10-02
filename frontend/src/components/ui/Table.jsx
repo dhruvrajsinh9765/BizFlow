@@ -1,13 +1,17 @@
-const Table = ({ columns = [], data = [], emptyMessage = "No data found." }) => {
+const Table = ({
+    columns = [],
+    data = [],
+    emptyMessage = "No data found.",
+}) => {
     return (
         <div className="w-full overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full min-w-full text-left">
                 <thead>
-                    <tr className="border-b border-slate-800">
+                    <tr className="border-b border-slate-800/90">
                         {columns.map((column) => (
                             <th
                                 key={column.key}
-                                className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-slate-500"
+                                className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500"
                             >
                                 {column.label}
                             </th>
@@ -15,12 +19,12 @@ const Table = ({ columns = [], data = [], emptyMessage = "No data found." }) => 
                     </tr>
                 </thead>
 
-                <tbody>
+                <tbody className="divide-y divide-slate-800/60">
                     {data.length === 0 ? (
                         <tr>
                             <td
                                 colSpan={columns.length}
-                                className="px-4 py-8 text-center text-sm text-slate-500"
+                                className="px-4 py-10 text-center text-sm text-slate-500"
                             >
                                 {emptyMessage}
                             </td>
@@ -29,7 +33,7 @@ const Table = ({ columns = [], data = [], emptyMessage = "No data found." }) => 
                         data.map((row, rowIndex) => (
                             <tr
                                 key={row.id || rowIndex}
-                                className="border-b border-slate-800/50 last:border-0"
+                                className="transition-colors duration-150 hover:bg-slate-800/30"
                             >
                                 {columns.map((column) => (
                                     <td
@@ -51,4 +55,3 @@ const Table = ({ columns = [], data = [], emptyMessage = "No data found." }) => 
 };
 
 export default Table;
-

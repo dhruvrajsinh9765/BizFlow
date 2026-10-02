@@ -1,5 +1,6 @@
 import {
     useEffect,
+    useMemo,
     useState,
 } from "react";
 
@@ -45,6 +46,7 @@ const PERIODS = {
     "6M": 180,
     "1Y": 365,
 };
+
 
 const getDateString = (date) => {
     const year = date.getFullYear();
@@ -110,113 +112,21 @@ const getDateRange = (period, selectedYear = "", selectedMonth = "") => {
     };
 };
 
-const getChartGranularity = (period, selectedYear, selectedMonth) => {
-    if (selectedYear || selectedMonth) {
-        return "month";
-    }
-
-    return period === "7D" || period === "30D"
-        ? "day"
-        : "month";
-};
-
-const getChartKey = (date, granularity) => {
-    if (granularity === "day") {
-        return getDateString(date);
-    }
-
-    return `${date.getFullYear()}-${String(
-        date.getMonth() + 1
-    ).padStart(2, "0")}`;
-};
-
-const getChartLabel = (date, granularity) => {
-    if (granularity === "day") {
-        return date.toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-        });
-    }
-
-    return date.toLocaleDateString("en-IN", {
-        month: "short",
-        year: "numeric",
-    });
-};
-
-const buildChartData = (transactions, categories, startDate, endDate, granularity) => {
-    const start = new Date(`${startDate}T00:00:00`);
-    const end = new Date(`${endDate}T00:00:00`);
-
-    const buckets = new Map();
-    const cursor = new Date(start);
-
-    if (granularity === "month") {
-        cursor.setDate(1);
-    }
-
-    while (cursor <= end) {
-        const key = getChartKey(cursor, granularity);
-
-        buckets.set(key, {
-            period: key,
-            label: getChartLabel(cursor, granularity),
-            income: 0,
-            expense: 0,
-        });
-
-        if (granularity === "day") {
-            cursor.setDate(cursor.getDate() + 1);
-        } else {
-            cursor.setMonth(cursor.getMonth() + 1);
-        }
-    }
-
-    transactions.forEach((transaction) => {
-        if (!transaction?.transactionDate) {
-            return;
-        }
-
-        const date = new Date(transaction.transactionDate);
-
-        if (Number.isNaN(date.getTime())) {
-            return;
-        }
-
-        const category =
-            typeof transaction.categoryId === "object"
-                ? transaction.categoryId
-                : categories.find(
-                      (item) =>
-                          item._id === transaction.categoryId
-                  );
-
-        const key = getChartKey(date, granularity);
-        const bucket = buckets.get(key);
-
-        if (!bucket || !category?.type) {
-            return;
-        }
-
-        const amount = Number(transaction.amount) || 0;
-
-        if (category.type === "income") {
-            bucket.income += amount;
-        } else if (category.type === "expense") {
-            bucket.expense += amount;
-        }
-    });
-
-    return Array.from(buckets.values());
-};
 
 const Overview = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
+
     const [dashboard, setDashboard] = useState(null);
     const [recentTransactions, setRecentTransactions] =
         useState([]);
+
+    const [chartTransactions, setChartTransactions] =
+        useState([]);
+    const [chartLoading, setChartLoading] =
+        useState(true);
+    const [chartError, setChartError] = useState("");
 
     const [period, setPeriod] = useState("30D");
     const [selectedYear, setSelectedYear] = useState("");
@@ -239,8 +149,7 @@ const Overview = () => {
     const [customerContributionError, setCustomerContributionError] =
         useState("");
 
-    const [chartData, setChartData] = useState([]);
-    const [chartLoading, setChartLoading] = useState(true);
+
 
     /*
      * ---------------------------------------------------------
@@ -254,7 +163,11 @@ const Overview = () => {
             setError("");
 
             const { startDate, endDate } =
-                getDateRange(period, selectedYear, selectedMonth);
+                getDateRange(
+                    period,
+                    selectedYear,
+                    selectedMonth
+                );
 
             const [
                 analyticsData,
@@ -284,6 +197,87 @@ const Overview = () => {
 
     useEffect(() => {
         fetchDashboard();
+    }, [period, selectedYear, selectedMonth]);
+
+    /*
+     * ---------------------------------------------------------
+     * Financial Performance Transactions
+     * ---------------------------------------------------------
+     */
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchChartTransactions = async () => {
+            try {
+                setChartLoading(true);
+                setChartError("");
+
+                const { startDate, endDate } =
+                    getDateRange(
+                        period,
+                        selectedYear,
+                        selectedMonth
+                    );
+
+                const transactionLimit = 100;
+                let page = 1;
+                let allTransactions = [];
+                let totalPages = 1;
+
+                do {
+                    const data =
+                        await transactionService.getTransactions({
+                            page,
+                            limit: transactionLimit,
+                            startDate,
+                            endDate,
+                            sortBy: "transactionDate",
+                            order: "asc",
+                        });
+
+                    allTransactions = [
+                        ...allTransactions,
+                        ...(data?.transactions || []),
+                    ];
+
+                    totalPages =
+                        Number(
+                            data?.pagination?.totalPages
+                        ) || 1;
+
+                    page += 1;
+                } while (page <= totalPages);
+
+                if (!cancelled) {
+                    setChartTransactions(
+                        allTransactions
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load financial performance transactions:",
+                    error
+                );
+
+                if (!cancelled) {
+                    setChartTransactions([]);
+                    setChartError(
+                        "Unable to load financial performance. Please try again."
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setChartLoading(false);
+                }
+            }
+        };
+
+        fetchChartTransactions();
+
+        return () => {
+            cancelled = true;
+        };
     }, [period, selectedYear, selectedMonth]);
 
     /*
@@ -340,7 +334,11 @@ const Overview = () => {
                 setCustomerContributionError("");
 
                 const { startDate, endDate } =
-                    getDateRange(period, selectedYear, selectedMonth);
+                    getDateRange(
+                        period,
+                        selectedYear,
+                        selectedMonth
+                    );
 
                 const transactionLimit = 100;
                 let page = 1;
@@ -520,97 +518,21 @@ const Overview = () => {
         ) {
             fetchCustomerContribution();
         } else {
-            setCustomerContributionLoading(true);
+            setCustomerContribution([]);
+            setCustomerContributionLoading(false);
+            setCustomerContributionError("");
         }
 
         return () => {
             cancelled = true;
         };
-    }, [period, selectedYear, selectedMonth, categories, contacts]);
-
-    /*
-     * ---------------------------------------------------------
-     * Financial Chart
-     * ---------------------------------------------------------
-     */
-
-    useEffect(() => {
-        let cancelled = false;
-
-        const fetchChartData = async () => {
-            try {
-                setChartLoading(true);
-
-                const { startDate, endDate } =
-                    getDateRange(period, selectedYear, selectedMonth);
-
-                const transactionLimit = 100;
-                let page = 1;
-                let allTransactions = [];
-                let totalPages = 1;
-
-                do {
-                    const data =
-                        await transactionService.getTransactions({
-                            page,
-                            limit: transactionLimit,
-                            startDate,
-                            endDate,
-                        });
-
-                    allTransactions = [
-                        ...allTransactions,
-                        ...(data?.transactions || []),
-                    ];
-
-                    totalPages =
-                        Number(data?.pagination?.totalPages) || 1;
-                    page += 1;
-                } while (page <= totalPages);
-
-                const granularity = getChartGranularity(
-                    period,
-                    selectedYear,
-                    selectedMonth
-                );
-
-                const result = buildChartData(
-                    allTransactions,
-                    categories,
-                    startDate,
-                    endDate,
-                    granularity
-                );
-
-                if (!cancelled) {
-                    setChartData(result);
-                }
-            } catch (error) {
-                console.error(
-                    "Failed to load financial chart data:",
-                    error
-                );
-
-                if (!cancelled) {
-                    setChartData([]);
-                }
-            } finally {
-                if (!cancelled) {
-                    setChartLoading(false);
-                }
-            }
-        };
-
-        if (categories.length > 0) {
-            fetchChartData();
-        } else {
-            setChartLoading(true);
-        }
-
-        return () => {
-            cancelled = true;
-        };
-    }, [period, selectedYear, selectedMonth, categories]);
+    }, [
+        period,
+        selectedYear,
+        selectedMonth,
+        categories,
+        contacts,
+    ]);
 
     /*
      * ---------------------------------------------------------
@@ -733,6 +655,175 @@ const Overview = () => {
     const categorySummary =
         dashboard?.categorySummary || [];
 
+    const categoryTypeMap = useMemo(() => {
+        const map = new Map();
+
+        categories.forEach((category) => {
+            if (category?._id && category?.type) {
+                map.set(
+                    String(category._id),
+                    category.type
+                );
+            }
+        });
+
+        categorySummary.forEach((category) => {
+            if (category?.categoryId && category?.type) {
+                map.set(
+                    String(category.categoryId),
+                    category.type
+                );
+            }
+        });
+
+        return map;
+    }, [categories, categorySummary]);
+
+    const financialPerformanceData = useMemo(() => {
+        const { startDate, endDate } =
+            getDateRange(
+                period,
+                selectedYear,
+                selectedMonth
+            );
+
+        const start = new Date(`${startDate}T00:00:00`);
+        const end = new Date(`${endDate}T00:00:00`);
+
+        const isDaily =
+            period === "7D" ||
+            period === "30D" ||
+            selectedMonth !== "" ||
+            (selectedYear && selectedMonth !== "");
+
+        const getCategoryType = (transaction) => {
+            if (
+                typeof transaction?.categoryId ===
+                "object"
+            ) {
+                return transaction.categoryId?.type || null;
+            }
+
+            return (
+                categoryTypeMap.get(
+                    String(transaction?.categoryId || "")
+                ) || null
+            );
+        };
+
+        const valuesMap = new Map();
+
+        chartTransactions.forEach((transaction) => {
+            const date = new Date(
+                transaction?.transactionDate
+            );
+
+            if (Number.isNaN(date.getTime())) {
+                return;
+            }
+
+            const type = getCategoryType(transaction);
+
+            if (type !== "income" && type !== "expense") {
+                return;
+            }
+
+            const year = date.getFullYear();
+            const month = String(
+                date.getMonth() + 1
+            ).padStart(2, "0");
+            const day = String(
+                date.getDate()
+            ).padStart(2, "0");
+
+            const key = isDaily
+                ? `${year}-${month}-${day}`
+                : `${year}-${month}`;
+
+            const current = valuesMap.get(key) || {
+                income: 0,
+                expense: 0,
+            };
+
+            current[type] +=
+                Number(transaction?.amount) || 0;
+
+            valuesMap.set(key, current);
+        });
+
+        const data = [];
+        const cursor = new Date(start);
+
+        cursor.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+
+        while (cursor <= end) {
+            const year = cursor.getFullYear();
+            const month = String(
+                cursor.getMonth() + 1
+            ).padStart(2, "0");
+            const day = String(
+                cursor.getDate()
+            ).padStart(2, "0");
+
+            const key = isDaily
+                ? `${year}-${month}-${day}`
+                : `${year}-${month}`;
+
+            const values = valuesMap.get(key) || {
+                income: 0,
+                expense: 0,
+            };
+
+            const label = isDaily
+                ? cursor.toLocaleDateString(
+                      "en-IN",
+                      {
+                          day: "2-digit",
+                          month: "short",
+                      }
+                  )
+                : cursor.toLocaleDateString(
+                      "en-IN",
+                      {
+                          month: "short",
+                          year: "numeric",
+                      }
+                  );
+
+            data.push({
+                period: key,
+                label,
+                income: values.income,
+                expense: values.expense,
+            });
+
+            if (isDaily) {
+                cursor.setDate(cursor.getDate() + 1);
+            } else {
+                cursor.setMonth(cursor.getMonth() + 1);
+            }
+        }
+
+        return data;
+    }, [
+        period,
+        selectedYear,
+        selectedMonth,
+        chartTransactions,
+        categoryTypeMap,
+    ]);
+
+    const totalChartActivity = useMemo(() => {
+        return financialPerformanceData.reduce(
+            (total, item) =>
+                total +
+                Number(item.income || 0) +
+                Number(item.expense || 0),
+            0
+        );
+    }, [financialPerformanceData]);
+
     const totalIncome =
         Number(summary.totalIncome) || 0;
 
@@ -826,7 +917,6 @@ const Overview = () => {
     const insights = aiInsights?.insights || {};
 
 
-
     /*
      * ---------------------------------------------------------
      * Loading / Initial Error
@@ -888,7 +978,6 @@ const Overview = () => {
                         in your business.
                     </p>
                 </div>
-
             </div>
 
             {/* =================================================
@@ -907,7 +996,9 @@ const Overview = () => {
                                 setSelectedMonth("");
                             }}
                             className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                                period === option && !selectedYear && !selectedMonth
+                                period === option &&
+                                !selectedYear &&
+                                selectedMonth === ""
                                     ? "bg-indigo-500 text-white"
                                     : "text-slate-400 hover:text-white"
                             }`}
@@ -948,7 +1039,10 @@ const Overview = () => {
                         <option value="">All months</option>
                         {Array.from({ length: 12 }, (_, index) => (
                             <option key={index} value={index}>
-                                {new Date(2000, index, 1).toLocaleString("en-IN", { month: "long" })}
+                                {new Date(2000, index, 1).toLocaleString(
+                                    "en-IN",
+                                    { month: "long" }
+                                )}
                             </option>
                         ))}
                     </select>
@@ -956,12 +1050,25 @@ const Overview = () => {
             </div>
 
             <p className="text-xs text-slate-500">
-                {selectedYear && selectedMonth
-                    ? `Showing financial data for ${new Date(Number(selectedYear), Number(selectedMonth), 1).toLocaleString("en-IN", { month: "long", year: "numeric" })}`
+                {selectedYear && selectedMonth !== ""
+                    ? `Showing financial data for ${new Date(
+                          Number(selectedYear),
+                          Number(selectedMonth),
+                          1
+                      ).toLocaleString("en-IN", {
+                          month: "long",
+                          year: "numeric",
+                      })}`
                     : selectedYear
                     ? `Showing financial data for ${selectedYear}`
-                    : selectedMonth
-                    ? `Showing ${new Date(2000, Number(selectedMonth), 1).toLocaleString("en-IN", { month: "long" })} for the current year`
+                    : selectedMonth !== ""
+                    ? `Showing ${new Date(
+                          2000,
+                          Number(selectedMonth),
+                          1
+                      ).toLocaleString("en-IN", {
+                          month: "long",
+                      })} for the current year`
                     : "Dashboard data for the selected period"}
             </p>
 
@@ -1099,19 +1206,27 @@ const Overview = () => {
             >
                 {chartLoading ? (
                     <div className="flex h-80 items-center justify-center">
-                        <div className="flex items-center gap-3 text-sm text-slate-400">
-                            <LoadingSpinner size="sm" />
+                        <div className="flex flex-col items-center gap-3 text-sm text-slate-500">
+                            <LoadingSpinner size="lg" />
                             Updating financial performance...
                         </div>
                     </div>
-                ) : chartData.length > 0 ? (
+                ) : chartError ? (
+                    <div className="flex h-80 items-center justify-center text-center">
+                        <p className="max-w-md text-sm text-red-400">
+                            {chartError}
+                        </p>
+                    </div>
+                ) : totalChartActivity > 0 ? (
                     <div className="h-80 w-full">
                         <ResponsiveContainer
                             width="100%"
                             height="100%"
                         >
                             <LineChart
-                                data={chartData}
+                                data={
+                                    financialPerformanceData
+                                }
                                 margin={{
                                     top: 10,
                                     right: 10,
@@ -1511,86 +1626,55 @@ const Overview = () => {
             </Card>
 
             {/* =================================================
-                AI BUSINESS INSIGHTS
+                AI INSIGHT
             ================================================= */}
 
             <Card>
-                <div className="flex flex-col gap-5">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex items-start gap-3">
-                            <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400">
-                                <Sparkles size={18} />
-                            </div>
-
-                            <div>
-                                <p className="text-xs font-medium uppercase tracking-wide text-indigo-400">
-                                    AI Business Insights
-                                </p>
-                                <h2 className="mt-1 text-lg font-semibold text-white">
-                                    What stands out in your business
-                                </h2>
-                                <p className="mt-1 text-sm text-slate-400">
-                                    Highlights from your latest business data. Open AI Analyst for the detailed analysis and recommendations.
-                                </p>
-                            </div>
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex min-w-0 items-start gap-3">
+                        <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400">
+                            <Sparkles size={18} />
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={() => navigate("/ai-analyst")}
-                            className="inline-flex w-fit shrink-0 items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm font-medium text-slate-200 transition hover:border-indigo-500/50 hover:bg-slate-800 hover:text-white"
-                        >
-                            Open AI Analyst
-                            <ChevronRight size={16} />
-                        </button>
+                        <div className="min-w-0">
+                            <p className="text-xs font-medium uppercase tracking-wide text-indigo-400">
+                                AI Insight
+                            </p>
+
+                            {aiLoading ? (
+                                <div className="mt-2 flex items-center gap-2 text-sm text-slate-400">
+                                    <LoadingSpinner size="sm" />
+                                    Analyzing your business data...
+                                </div>
+                            ) : aiError ? (
+                                <p className="mt-1 text-sm text-slate-400">
+                                    AI insights are temporarily unavailable.
+                                </p>
+                            ) : insights.summary ? (
+                                <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-300">
+                                    {insights.summary}
+                                </p>
+                            ) : Array.isArray(insights.keyFindings) &&
+                              insights.keyFindings[0]?.description ? (
+                                <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-300">
+                                    {insights.keyFindings[0].description}
+                                </p>
+                            ) : (
+                                <p className="mt-1 text-sm text-slate-400">
+                                    Open AI Analyst for a detailed view of your business performance.
+                                </p>
+                            )}
+                        </div>
                     </div>
 
-                    {aiLoading ? (
-                        <div className="flex items-center gap-2 text-sm text-slate-400">
-                            <LoadingSpinner size="sm" />
-                            Analyzing your business data...
-                        </div>
-                    ) : aiError ? (
-                        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">
-                            AI insights are temporarily unavailable.
-                        </div>
-                    ) : Array.isArray(insights.keyFindings) && insights.keyFindings.length > 0 ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {insights.keyFindings.slice(0, 2).map((item, index) => (
-                                <div
-                                    key={`overview-finding-${index}`}
-                                    className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"
-                                >
-                                    <p className="text-sm font-semibold text-white">
-                                        {item?.title || "Business finding"}
-                                    </p>
-
-                                    {item?.description && (
-                                        <p className="mt-2 text-sm leading-6 text-slate-400">
-                                            {item.description}
-                                        </p>
-                                    )}
-
-                                    {item?.evidence && (
-                                        <p className="mt-3 border-t border-slate-800 pt-3 text-xs leading-5 text-slate-500">
-                                            <span className="font-medium text-slate-400">Evidence:</span>{" "}
-                                            {item.evidence}
-                                        </p>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    ) : insights.summary ? (
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-                            <p className="text-sm leading-6 text-slate-300">
-                                {insights.summary}
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="text-sm text-slate-400">
-                            Open AI Analyst for a detailed view of your business performance.
-                        </p>
-                    )}
+                    <button
+                        type="button"
+                        onClick={() => navigate("/ai-analyst")}
+                        className="inline-flex w-fit shrink-0 items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm font-medium text-slate-200 transition hover:border-indigo-500/50 hover:bg-slate-800 hover:text-white"
+                    >
+                        Open AI Analyst
+                        <ChevronRight size={16} />
+                    </button>
                 </div>
             </Card>
 
@@ -1735,7 +1819,7 @@ const Overview = () => {
 
             <Card
                 title="Category Summary"
-                description="Your financial activity grouped by category. Percentages show each category’s share of total financial activity."
+                description="Your financial activity grouped by category."
             >
                 {visibleCategorySummary.length >
                 0 ? (
