@@ -1,5 +1,14 @@
 const userService = require("../services/userService");
 
+const isProduction = process.env.NODE_ENV === "production";
+
+const cookieOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000
+};
+
 const registerUser = async (req, res) => {
     const result = await userService.registerUser(req.body);
 
@@ -9,12 +18,7 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     const result = await userService.loginUser(req.body);
 
-    res.cookie("refreshToken", result.refreshToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000
-    });
+    res.cookie("refreshToken", result.refreshToken, cookieOptions);
 
     const { refreshToken, ...responseData } = result;
 
@@ -37,10 +41,10 @@ const logoutUser = async (req, res) => {
     const result = await userService.logoutUser(refreshToken);
 
     res.clearCookie("refreshToken", {
-        httpOnly: true,
-        secure: false,
-        sameSite: "lax"
-    });
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax"
+});
 
     res.send(result);
 };
@@ -66,10 +70,10 @@ const logoutFromAllDevices = async (req, res) => {
     );
 
     res.clearCookie("refreshToken", {
-        httpOnly: true,
-        secure: false,
-        sameSite: "lax"
-    });
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax"
+});
 
     res.send(result);
 };
