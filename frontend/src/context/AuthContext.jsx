@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import authService from "../services/authService";
-import { setAccessToken } from "../services/api";
+import {
+    setAccessToken,
+    setSessionExpiredHandler,
+} from "../services/api";
 
 
 const AuthContext = createContext(null);
@@ -45,6 +48,13 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    useEffect(() => {
+        setSessionExpiredHandler(clearSession);
+
+        return () => {
+            setSessionExpiredHandler(null);
+        };
+    }, []);
 
     const refreshSession = async () => {
         try {
