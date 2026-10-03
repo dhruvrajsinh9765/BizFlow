@@ -34,6 +34,8 @@ api.interceptors.response.use(
         if (
             error.response?.status !== 401 ||
             originalRequest?.url?.includes("/users/refresh-token") ||
+            originalRequest?.url?.includes("/users/login") ||
+            originalRequest?.url?.includes("/users/register") ||
             originalRequest?._retry
         ) {
             return Promise.reject(error);
